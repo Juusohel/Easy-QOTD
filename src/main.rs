@@ -15,6 +15,16 @@ use serenity::{
 
 use tokio_postgres::NoTls;
 
-fn main() {
+// Container for psql client
+struct DataClient {
+    _tokio_postgres: tokio_postgres::Client,
+}
+
+impl TypeMapKey for DataClient {
+    type Value = Arc<tokio_postgres::Client>;
+}
+
+#[tokio::main]
+async fn main() {
     println!("Hello, world!");
 }
