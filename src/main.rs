@@ -12,6 +12,7 @@ use serenity::{
     model::{channel::Message, gateway::Ready},
     prelude::*,
 };
+use serenity::model::id::GuildId;
 
 use tokio_postgres::NoTls;
 
@@ -62,7 +63,7 @@ async fn main() {
 
     // Serenity framework
     let framework = StandardFramework::new()
-        .configure(|c| c.prefix("!q").case_insensitivity(true))
+        .configure(|c| c.prefix("q!").case_insensitivity(true))
         .group(&GENERAL_GROUP);
 
     // Serenity discord client builder
@@ -92,3 +93,10 @@ async fn help(ctx: &Context, msg: &Message) -> CommandResult {
 
     Ok(())
 }
+
+async fn set_qotd_channel(ctx: &Context, msg: &Message) -> CommandResult {
+
+
+    Ok(())
+}
+
