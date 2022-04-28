@@ -1,5 +1,5 @@
 use std::sync::Arc;
-use std::{env, fs};
+use std::{env, fs, io};
 
 use serenity::framework::standard::{
     macros::{command, group},
@@ -7,11 +7,7 @@ use serenity::framework::standard::{
 };
 
 use serenity::utils::Color;
-use serenity::{
-    async_trait,
-    model::{channel::Message, gateway::Ready},
-    prelude::*,
-};
+use serenity::{async_trait, Error, model::{channel::Message, gateway::Ready}, prelude::*};
 use serenity::model::id::GuildId;
 
 use tokio_postgres::NoTls;
@@ -86,6 +82,31 @@ async fn main() {
 
  }
 
+// Setting the channel id from the database for the server id in question
+// Server_id is taken from parsed within the command.
+// channel_id: String - Channel id to be set in the database
+async fn set_channel_id(channel_id: String, server_id: String, ctx: &Context) -> Result<u64, tokio_postgres::Error> {
+    let read = ctx.data.read().await;
+    let client = read
+        .get::<DataClient>()
+        .expect("PSQL Client error")
+        .clone();
+
+    // Assuming the channel ID is a valid one, parsed at command level
+    // Upserting into the database
+    let upsert = client
+        .execute(
+            "INSERT INTO channels (guild_id, channel_id)
+            VALUES ($1, $2)
+            ON CONFLICT (guild_id)
+            DO
+            UPDATE SET channel_id = EXCLUDED.channel_id",
+            &[&server_id, &channel_id],
+        )
+        .await;
+
+    upsert
+}
 
 #[command]
 async fn help(ctx: &Context, msg: &Message) -> CommandResult {
