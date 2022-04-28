@@ -83,9 +83,9 @@ async fn main() {
  }
 
 // Setting the channel id from the database for the server id in question
-// Server_id is taken from parsed within the command.
+// guild_id is from parsed within the command.
 // channel_id: String - Channel id to be set in the database
-async fn set_channel_id(channel_id: String, server_id: String, ctx: &Context) -> Result<u64, tokio_postgres::Error> {
+async fn set_channel_id(channel_id: String, guild_id: String, ctx: &Context) -> Result<u64, tokio_postgres::Error> {
     let read = ctx.data.read().await;
     let client = read
         .get::<DataClient>()
@@ -101,11 +101,36 @@ async fn set_channel_id(channel_id: String, server_id: String, ctx: &Context) ->
             ON CONFLICT (guild_id)
             DO
             UPDATE SET channel_id = EXCLUDED.channel_id",
-            &[&server_id, &channel_id],
+            &[&guild_id, &channel_id],
         )
         .await;
 
     upsert
+}
+
+async fn get_channel_id(guild_id: String, ctx: &Context) -> String {
+    // Pulling in psql client
+    let read = ctx.data.read().await;
+    let client = read
+        .get::<DataClient>()
+        .expect("PSQL Client error")
+        .clone();
+
+    let mut channel_id;
+    let rows = client
+        .query(
+            "SELECT channel_id FROM channels WHERE guild_id = $1",
+            &[&guild_id]
+        )
+        .await
+        .expect("Error querying database");
+    if rows.len() > 0 {
+        channel_id = rows[0].get(0);
+    }
+    else {
+        channel_id = String::from("0");
+    }
+    channel_id
 }
 
 #[command]
