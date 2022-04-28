@@ -108,6 +108,8 @@ async fn set_channel_id(channel_id: String, guild_id: String, ctx: &Context) -> 
     upsert
 }
 
+// Pulls channel id from the database using the guild id.
+// Returns 0 if no result
 async fn get_channel_id(guild_id: String, ctx: &Context) -> String {
     // Pulling in psql client
     let read = ctx.data.read().await;
