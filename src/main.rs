@@ -82,9 +82,9 @@ async fn main() {
 
  }
 
-// Setting the channel id from the database for the server id in question
-// guild_id is from parsed within the command.
-// channel_id: String - Channel id to be set in the database
+/// Setting the channel id from the database for the server id in question
+/// guild_id is from parsed within the command.
+/// channel_id: String - Channel id to be set in the database
 async fn set_channel_id(channel_id: String, guild_id: String, ctx: &Context) -> Result<u64, tokio_postgres::Error> {
     let read = ctx.data.read().await;
     let client = read
@@ -108,8 +108,8 @@ async fn set_channel_id(channel_id: String, guild_id: String, ctx: &Context) -> 
     upsert
 }
 
-// Pulls channel id from the database using the guild id.
-// Returns 0 if no result
+/// Pulls channel id from the database using the guild id.
+/// Returns 0 if no result
 async fn get_channel_id(guild_id: String, ctx: &Context) -> String {
     // Pulling in psql client
     let read = ctx.data.read().await;
@@ -146,17 +146,25 @@ async fn help(ctx: &Context, msg: &Message) -> CommandResult {
 async fn set_qotd_channel(ctx: &Context, msg: &Message) -> CommandResult {
     let guild_id = msg.guild_id.unwrap(); // lazy solution, expecting the message to exist
 
-    // Parsing channel id from the user message
-    if let Some(cid) = parse_channel(&msg.content[19..]) {
-        let channel_id = cid;
+    // If message is a valid message
+    if msg.content.len() >= 19 {
+        // Parsing channel id from the user message
+        if let Some(cid) = parse_channel(&msg.content[19..]) {
+            let channel_id = cid;
 
-        // Calling function to set the the stuff to database
-        set_channel_id(channel_id.to_string(), guild_id.to_string(), ctx).await?;
-        msg.reply(ctx, "Channel set!").await?;
+            // Calling function to set the the stuff to database
+            set_channel_id(channel_id.to_string(), guild_id.to_string(), ctx).await?;
+            msg.reply(ctx, "Channel set!").await?;
+        }
+        else {
+            msg.reply(ctx, "Not a valid channel!").await?;
+        }
     }
+    // If message isn't long enough or something else broken in it
     else {
         msg.reply(ctx, "Not a valid channel!").await?;
     }
+
 
     Ok(())
 }
@@ -165,12 +173,29 @@ async fn set_qotd_channel(ctx: &Context, msg: &Message) -> CommandResult {
 async fn qotd_channel(ctx: &Context, msg: &Message) -> CommandResult {
     let guild_id = msg.guild_id.unwrap(); // lazy solution, expecting the message to exist
 
-    let channel_id = format!(
-        "<#{}>",
-        get_channel_id(guild_id.to_string(), ctx).await
-    );
-    if let Some(_cid) = parse_channel(&channel_id) {
-        msg.reply(ctx, format!("Qotd channel is set to {}", channel_id)).await?;
+    let channel_id = get_channel_id(guild_id.to_string(), ctx).await;
+
+    // Slightly convoluted. If the string returned is a 0, that means there was no result
+    // This assumes channel id 0 does not exist on any server (safe assumption)
+    // If the string returned isn't a 0, it's the id of the channel assigned
+    // which is then formatted correctly for parse_channel.
+    let channel_string;
+    if channel_id != String::from("0") {
+        channel_string = format!(
+            "<#{}>",
+            channel_id
+        );
+    }
+    else {
+        channel_string = String::from("None");
+    }
+
+    // Fails if string was 0 and there was no result. Please don't judge me for this solution.
+    if let Some(_cid) = parse_channel(&channel_string) {
+        msg.reply(ctx, format!("Qotd channel is set to {}", channel_string)).await?;
+    }
+    else {
+        msg.reply(ctx ,"Channel not set!").await?;
     }
 
     Ok(())
