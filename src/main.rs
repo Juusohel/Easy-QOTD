@@ -135,6 +135,17 @@ async fn get_channel_id(guild_id: String, ctx: &Context) -> String {
     channel_id
 }
 
+
+async fn get_random_question() -> String {
+    // Get random question from database and return it
+    String::from("_")
+}
+
+async fn get_random_custom_question(guild_id: String) -> String {
+    // Get random custom question from database and return it
+    String::from("_")
+}
+
 #[command]
 async fn help(ctx: &Context, msg: &Message) -> CommandResult {
     println!("I'm help lmao");
@@ -201,3 +212,23 @@ async fn qotd_channel(ctx: &Context, msg: &Message) -> CommandResult {
     Ok(())
 }
 
+#[command]
+async fn qotd(ctx: &Context, msg: &Message) -> CommandResult {
+    //posts qotd to channel indicated
+    Ok(())
+}
+
+#[command]
+async fn custom_qotd(ctx: &Context, msg: &Message) -> CommandResult {
+    // chooses a qotd from customs for the server and posts
+
+    Ok(())
+}
+
+#[command]
+async fn submit_qotd(ctx: &Context, msg: &Message) -> CommandResult {
+    // submits and saves qotd for the server
+    // Might make submitting its own function outside the command
+
+    Ok(())
+}
