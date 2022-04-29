@@ -6,7 +6,7 @@ use serenity::framework::standard::{
     CommandResult, StandardFramework,
 };
 
-use serenity::utils::Color;
+use serenity::utils::{Color, parse_channel};
 use serenity::{async_trait, Error, model::{channel::Message, gateway::Ready}, prelude::*};
 use serenity::model::id::GuildId;
 
@@ -23,7 +23,7 @@ impl TypeMapKey for DataClient {
 
 // General framework for commands
 #[group]
-#[commands(help)]
+#[commands(help, set_qotd_channel)]
 struct General;
 
 struct MessageHandler;
@@ -142,9 +142,24 @@ async fn help(ctx: &Context, msg: &Message) -> CommandResult {
     Ok(())
 }
 
+#[command]
 async fn set_qotd_channel(ctx: &Context, msg: &Message) -> CommandResult {
+    let guild_id = msg.guild_id.unwrap(); // lazy solution, expecting the message to exist
 
+    // Parsing channel id from the user message
+    if let Some(cid) = parse_channel(&msg.content[19..]) {
+        let channel_id = cid;
+
+        // Calling function to set the the stuff to database
+        set_channel_id(channel_id.to_string(), guild_id.to_string(), ctx).await?;
+        msg.reply(ctx, "Channel set!").await?;
+    }
+    else {
+        msg.reply(ctx, "Not a valid channel!").await?;
+    }
 
     Ok(())
 }
+
+
 
