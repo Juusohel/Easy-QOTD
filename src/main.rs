@@ -23,7 +23,7 @@ impl TypeMapKey for DataClient {
 
 // General framework for commands
 #[group]
-#[commands(help, set_qotd_channel)]
+#[commands(help, set_qotd_channel, qotd_channel)]
 struct General;
 
 struct MessageHandler;
@@ -161,5 +161,18 @@ async fn set_qotd_channel(ctx: &Context, msg: &Message) -> CommandResult {
     Ok(())
 }
 
+#[command]
+async fn qotd_channel(ctx: &Context, msg: &Message) -> CommandResult {
+    let guild_id = msg.guild_id.unwrap(); // lazy solution, expecting the message to exist
 
+    let channel_id = format!(
+        "<#{}>",
+        get_channel_id(guild_id.to_string(), ctx).await
+    );
+    if let Some(_cid) = parse_channel(&channel_id) {
+        msg.reply(ctx, format!("Qotd channel is set to {}", channel_id)).await?;
+    }
+
+    Ok(())
+}
 
