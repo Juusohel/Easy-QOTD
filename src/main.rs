@@ -141,7 +141,7 @@ async fn get_channel_id(guild_id: String, ctx: &Context) -> String {
     channel_string
 }
 
-
+/// Gets a random question from the database and returns it as a string
 async fn get_random_question(ctx: &Context) -> String {
     // Pulling in psql client
     let read = ctx.data.read().await;
@@ -239,6 +239,7 @@ async fn qotd(ctx: &Context, msg: &Message) -> CommandResult {
     let channel_id = get_channel_id(guild_id.to_string(), ctx).await;
 
     if let Some(cid) = parse_channel(&channel_id) {
+        // Sending message to the channel assigned to the server
         let channel = ChannelId(cid);
         channel.send_message(ctx, |message| {
             message
