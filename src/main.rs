@@ -109,8 +109,8 @@ async fn set_channel_id(channel_id: String, guild_id: String, ctx: &Context) -> 
     upsert
 }
 
-/// Pulls channel id from the database using the guild id.
-/// Returns 0 if no result
+/// Pulls channel id formatted for parse_channel() from the database using the guild id.
+/// Returns "0" if no result
 async fn get_channel_id(guild_id: String, ctx: &Context) -> String {
     // Pulling in psql client
     let read = ctx.data.read().await;
@@ -119,7 +119,7 @@ async fn get_channel_id(guild_id: String, ctx: &Context) -> String {
         .expect("PSQL Client error")
         .clone();
 
-    let mut channel_id;
+    let mut channel_id: String;
     let rows = client
         .query(
             "SELECT channel_id FROM channels WHERE guild_id = $1",
@@ -127,13 +127,18 @@ async fn get_channel_id(guild_id: String, ctx: &Context) -> String {
         )
         .await
         .expect("Error querying database");
+    let channel_string;
     if rows.len() > 0 {
         channel_id = rows[0].get(0);
+        channel_string = format!(
+            "<#{}>",
+            channel_id
+        );
     }
     else {
-        channel_id = String::from("0");
+        channel_string = String::from("0");
     }
-    channel_id
+    channel_string
 }
 
 
@@ -209,22 +214,22 @@ async fn set_qotd_channel(ctx: &Context, msg: &Message) -> CommandResult {
 async fn qotd_channel(ctx: &Context, msg: &Message) -> CommandResult {
     let guild_id = msg.guild_id.unwrap(); // lazy solution, expecting the message to exist
 
-    let channel_id = get_channel_id(guild_id.to_string(), ctx).await;
+    let channel_string = get_channel_id(guild_id.to_string(), ctx).await;
 
     // Slightly convoluted. If the string returned is a 0, that means there was no result
     // This assumes channel id 0 does not exist on any server (safe assumption)
     // If the string returned isn't a 0, it's the id of the channel assigned
-    // which is then formatted correctly for parse_channel.
-    let channel_string;
-    if channel_id != String::from("0") {
-        channel_string = format!(
-            "<#{}>",
-            channel_id
-        );
-    }
-    else {
-        channel_string = String::from("None");
-    }
+    // which is then used for parse_channel.
+
+//    if channel_id != String::from("0") {
+//        channel_string = format!(
+//            "<#{}>",
+//            channel_id
+//        );
+//    }
+//   else {
+//        channel_string = String::from("None");
+//    }
 
     // Fails if string was 0 and there was no result. Please don't judge me for this solution.
     if let Some(_cid) = parse_channel(&channel_string) {
@@ -241,6 +246,7 @@ async fn qotd_channel(ctx: &Context, msg: &Message) -> CommandResult {
 async fn qotd(ctx: &Context, msg: &Message) -> CommandResult {
     let question = get_random_question(ctx).await;
 
+    Ok(())
 
 
 }
