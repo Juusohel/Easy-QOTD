@@ -12,6 +12,7 @@ use serenity::model::id::GuildId;
 
 use tokio_postgres::NoTls;
 
+
 // Container for psql client
 struct DataClient {
     _tokio_postgres: tokio_postgres::Client,
@@ -23,7 +24,7 @@ impl TypeMapKey for DataClient {
 
 // General framework for commands
 #[group]
-#[commands(help, set_qotd_channel, qotd_channel)]
+#[commands(help, set_qotd_channel, qotd_channel, qotd)]
 struct General;
 
 struct MessageHandler;
@@ -136,9 +137,33 @@ async fn get_channel_id(guild_id: String, ctx: &Context) -> String {
 }
 
 
-async fn get_random_question() -> String {
-    // Get random question from database and return it
-    String::from("_")
+async fn get_random_question(ctx: &Context) -> String {
+    // Pulling in psql client
+    let read = ctx.data.read().await;
+    let client = read
+        .get::<DataClient>()
+        .expect("PSQL Client error")
+        .clone();
+
+
+    // Getting a random entry from the database by querying the database with random order and displaying one.
+    // NOTE: This is rather inefficient because the function in psql is slow, and not exactly efficient
+    // Future implementations might make this a bit faster but while there isn't thousands of question this will work fine
+    // Using a random number generator with the multi-threading was kinda annoying and since there's less than 1000 entries, this should be fine, for now.
+    let rows = client
+        .query(
+            "SELECT question_string FROM questions WHERE in_use = $1 ORDER BY random() LIMIT 1",
+            &[&true]
+        )
+        .await
+        .expect("Error querying database");
+
+    let question_string= rows[0].get(0);
+
+    question_string
+
+
+
 }
 
 async fn get_random_custom_question(guild_id: String) -> String {
@@ -214,8 +239,10 @@ async fn qotd_channel(ctx: &Context, msg: &Message) -> CommandResult {
 
 #[command]
 async fn qotd(ctx: &Context, msg: &Message) -> CommandResult {
-    //posts qotd to channel indicated
-    Ok(())
+    let question = get_random_question(ctx).await;
+
+
+
 }
 
 #[command]
