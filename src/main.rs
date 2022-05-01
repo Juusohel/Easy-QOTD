@@ -8,7 +8,7 @@ use serenity::framework::standard::{
 
 use serenity::utils::{Color, parse_channel};
 use serenity::{async_trait, Error, model::{channel::Message, gateway::Ready}, prelude::*};
-use serenity::model::id::GuildId;
+use serenity::model::id::{ChannelId, GuildId};
 
 use tokio_postgres::NoTls;
 
@@ -214,26 +214,16 @@ async fn set_qotd_channel(ctx: &Context, msg: &Message) -> CommandResult {
 async fn qotd_channel(ctx: &Context, msg: &Message) -> CommandResult {
     let guild_id = msg.guild_id.unwrap(); // lazy solution, expecting the message to exist
 
-    let channel_string = get_channel_id(guild_id.to_string(), ctx).await;
+    let channel_id = get_channel_id(guild_id.to_string(), ctx).await;
 
     // Slightly convoluted. If the string returned is a 0, that means there was no result
     // This assumes channel id 0 does not exist on any server (safe assumption)
     // If the string returned isn't a 0, it's the id of the channel assigned
     // which is then used for parse_channel.
 
-//    if channel_id != String::from("0") {
-//        channel_string = format!(
-//            "<#{}>",
-//            channel_id
-//        );
-//    }
-//   else {
-//        channel_string = String::from("None");
-//    }
-
     // Fails if string was 0 and there was no result. Please don't judge me for this solution.
-    if let Some(_cid) = parse_channel(&channel_string) {
-        msg.reply(ctx, format!("Qotd channel is set to {}", channel_string)).await?;
+    if let Some(_cid) = parse_channel(&channel_id) {
+        msg.reply(ctx, format!("Qotd channel is set to {}", channel_id)).await?;
     }
     else {
         msg.reply(ctx ,"Channel not set!").await?;
@@ -244,7 +234,23 @@ async fn qotd_channel(ctx: &Context, msg: &Message) -> CommandResult {
 
 #[command]
 async fn qotd(ctx: &Context, msg: &Message) -> CommandResult {
+    let guild_id = msg.guild_id.unwrap();
     let question = get_random_question(ctx).await;
+    let channel_id = get_channel_id(guild_id.to_string(), ctx).await;
+
+    if let Some(cid) = parse_channel(&channel_id) {
+        let channel = ChannelId(cid);
+        channel.send_message(ctx, |message| {
+            message
+                .content(format!(
+                    "{}", question
+                ))
+        })
+            .await?;
+    }
+    else {
+        msg.reply(ctx ,"Channel not set!").await?;
+    }
 
     Ok(())
 
