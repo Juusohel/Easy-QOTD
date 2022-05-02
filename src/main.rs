@@ -24,7 +24,7 @@ impl TypeMapKey for DataClient {
 
 // General framework for commands
 #[group]
-#[commands(help, set_qotd_channel, qotd_channel, qotd)]
+#[commands(help, set_qotd_channel, qotd_channel, qotd, custom_qotd, submit_qotd)]
 struct General;
 
 struct MessageHandler;
@@ -259,7 +259,7 @@ async fn get_random_custom_question(guild_id: String, ctx: &Context) -> String {
 
     let rows = client
         .query(
-            "SELECT question_string FROM questions WHERE guild_id = $1 ORDER BY random() LIMIT 1",
+            "SELECT question_string FROM custom_questions WHERE guild_id = $1 ORDER BY random() LIMIT 1",
             &[&guild_id]
         )
         .await
@@ -362,15 +362,47 @@ async fn qotd(ctx: &Context, msg: &Message) -> CommandResult {
 
 #[command]
 async fn custom_qotd(ctx: &Context, msg: &Message) -> CommandResult {
-    // chooses a qotd from customs for the server and posts
+    let guild_id = msg.guild_id.unwrap();
+    let custom_question = get_random_custom_question(guild_id.to_string(), ctx).await;
+    let channel_id = get_channel_id(guild_id.to_string(),ctx).await;
+
+    if let Some(channel) = parse_channel(&channel_id) {
+        // Sending message to the channel assigned to the server
+        let channel = ChannelId(channel);
+        channel.send_message(ctx, |message| {
+            message
+                .content(format!(
+                    "{}", custom_question
+                ))
+        })
+            .await?;
+    }
+    else {
+        msg.reply(ctx ,"Channel not set!").await?;
+    }
 
     Ok(())
 }
 
 #[command]
 async fn submit_qotd(ctx: &Context, msg: &Message) -> CommandResult {
-    // submits and saves qotd for the server
-    // Might make submitting its own function outside the command
+    let guild_id = msg.guild_id.unwrap();
+    let user_submission;
+
+    // Could add regex for bad words etc here.
+    // If message is valid
+    if msg.content.len() >= 14 {
+        user_submission = &msg.content[14..];
+        if let Ok(_s) = add_custom_question(guild_id.to_string(), user_submission.to_string(), ctx).await {
+            msg.reply(ctx,"Question Submitted").await?;
+        }
+        else {
+            msg.reply(ctx, "Something went wrong!").await?;
+        }
+    }
+    else {
+        msg.reply(ctx,"Question not accepted").await?;
+    }
 
     Ok(())
 }
