@@ -171,6 +171,24 @@ async fn get_random_question(ctx: &Context) -> String {
 
 }
 
+async fn add_custom_question(guild_id: String, question: String, ctx: &Context) -> Result<u64, tokio_postgres::Error> {
+    // Pulling in psql client
+    let read = ctx.data.read().await;
+    let client = read
+        .get::<DataClient>()
+        .expect("PSQL Client error")
+        .clone();
+
+    let insert = client
+        .execute(
+            "INSERT INTO custom_questions (guild_id, question_string) VALUES ($1, $2)",
+            &[&guild_id, &question]
+        )
+        .await;
+
+    insert
+}
+
 async fn get_random_custom_question(guild_id: String) -> String {
     // Get random custom question from database and return it
     String::from("_")
