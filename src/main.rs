@@ -374,3 +374,10 @@ async fn submit_qotd(ctx: &Context, msg: &Message) -> CommandResult {
 
     Ok(())
 }
+
+#[command]
+async fn delete_question(ctx: &Context, msg: &Message) -> CommandResult {
+
+
+    Ok(())
+}
