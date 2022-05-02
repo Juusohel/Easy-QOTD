@@ -228,6 +228,7 @@ async fn delete_custom_question(guild_id: String, question_id: i32, ctx: &Contex
 
 }
 
+/// Gets all the questions submitted by the guild_id and returns vector of rows
 async fn get_list_custom_questions(guild_id: String, ctx: &Context) -> Vec<Row> {
     // Pulling in psql client
     let read = ctx.data.read().await;
@@ -247,9 +248,26 @@ async fn get_list_custom_questions(guild_id: String, ctx: &Context) -> Vec<Row> 
     rows
 }
 
-async fn get_random_custom_question(guild_id: String) -> String {
-    // Get random custom question from database and return it
-    String::from("_")
+async fn get_random_custom_question(guild_id: String, ctx: &Context) -> String {
+    // Pulling in psql client
+    let read = ctx.data.read().await;
+    let client = read
+        .get::<DataClient>()
+        .expect("PSQL Client error")
+        .clone();
+
+    let rows = client
+        .query(
+            "SELECT question_string FROM questions WHERE guild_id = $1 ORDER BY random() LIMIT 1",
+            &[&guild_id]
+        )
+        .await
+        .expect("Error querying database");
+
+    let question_string= rows[0].get(0);
+
+    question_string
+
 }
 
 #[command]
