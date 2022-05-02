@@ -279,6 +279,31 @@ async fn get_random_custom_question(guild_id: String, ctx: &Context) -> String {
 
 }
 
+
+async fn get_specific_custom(guild_id: String, question_id: i32, ctx: &Context) -> String {
+    // Pulling in psql client
+    let read = ctx.data.read().await;
+    let client = read
+        .get::<DataClient>()
+        .expect("PSQL Client error")
+        .clone();
+
+    let rows = client
+        .query(
+            "SELECT question_string FROM custom_questions WHERE guild_id = $1 AND question_id = $2",
+            &[&guild_id, &question_id]
+        )
+        .await
+        .expect("Error querying database");
+
+    if rows.len() > 0 {
+        rows[0].get(0)
+    }
+    else {
+        String::from("Question does not exist!")
+    }
+}
+
 #[command]
 async fn help(ctx: &Context, msg: &Message) -> CommandResult {
     println!("I'm help lmao");
@@ -364,8 +389,24 @@ async fn qotd(ctx: &Context, msg: &Message) -> CommandResult {
 #[command]
 async fn custom_qotd(ctx: &Context, msg: &Message) -> CommandResult {
     let guild_id = msg.guild_id.unwrap();
-    let custom_question = get_random_custom_question(guild_id.to_string(), ctx).await;
+    let custom_question;
     let channel_id = get_channel_id(guild_id.to_string(),ctx).await;
+
+
+    if msg.content.len() >= 14 {
+        if let Ok(id_to_use) =  &msg.content[14..].parse::<i32>() {
+            let id_to_use = *id_to_use;
+            custom_question = get_specific_custom(guild_id.to_string(), id_to_use, ctx).await;
+        }
+        else {
+            msg.reply(ctx, "Not a valid question ID").await?;
+            return Ok(());
+        }
+
+    }
+    else {
+        custom_question = get_random_custom_question(guild_id.to_string(), ctx).await;
+    }
 
     if let Some(channel) = parse_channel(&channel_id) {
         // Sending message to the channel assigned to the server
@@ -469,3 +510,5 @@ async fn delete_question(ctx: &Context, msg: &Message) -> CommandResult {
 
     Ok(())
 }
+
+// TODO: Add list of customs command with borrowed logic from delete
