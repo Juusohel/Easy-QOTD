@@ -171,6 +171,7 @@ async fn get_random_question(ctx: &Context) -> String {
 
 }
 
+/// Adds a custom question to the database with the associated guild_id
 async fn add_custom_question(guild_id: String, question: String, ctx: &Context) -> Result<u64, tokio_postgres::Error> {
     // Pulling in psql client
     let read = ctx.data.read().await;
@@ -188,6 +189,46 @@ async fn add_custom_question(guild_id: String, question: String, ctx: &Context) 
 
     insert
 }
+
+/// Deletes a specified question from the database.
+/// Using the guild_id provided, the function checks ownership of the question matches the ID.
+/// If match, the question is deleted.
+/// Returns 1 on successful deletion
+/// Returns 0 if deletion failed.
+async fn delete_custom_question(guild_id: String, question_id: i32, ctx: &Context) -> i32 {
+    // Pulling in psql client
+    let read = ctx.data.read().await;
+    let client = read
+        .get::<DataClient>()
+        .expect("PSQL Client error")
+        .clone();
+
+    // Checking if a question with the guild_id of the requesting server exists, if it exists, delete the question.
+    // This prevents from other servers deleting each others questions.
+    let rows = client
+        .query(
+            "SELECT * FROM custom_questions WHERE guild_id = $1 AND question_id = $2",
+            &[&guild_id, &question_id]
+        )
+        .await
+        .expect("Select Failed");
+    if rows.len() > 0 {
+        let delete = client.execute(
+            "DELETE FROM custom_questions WHERE question id = $1",
+            &[&question_id]
+        )
+            .await
+            .expect("Delete failed");
+
+        1
+    }
+    else {
+        0
+    }
+
+}
+
+
 
 async fn get_random_custom_question(guild_id: String) -> String {
     // Get random custom question from database and return it
