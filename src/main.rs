@@ -10,7 +10,7 @@ use serenity::utils::{Color, parse_channel};
 use serenity::{async_trait, Error, model::{channel::Message, gateway::Ready}, prelude::*};
 use serenity::model::id::{ChannelId, GuildId};
 
-use tokio_postgres::NoTls;
+use tokio_postgres::{NoTls, Row, RowStream};
 
 
 // Container for psql client
@@ -228,7 +228,24 @@ async fn delete_custom_question(guild_id: String, question_id: i32, ctx: &Contex
 
 }
 
+async fn get_list_custom_questions(guild_id: String, ctx: &Context) -> Vec<Row> {
+    // Pulling in psql client
+    let read = ctx.data.read().await;
+    let client = read
+        .get::<DataClient>()
+        .expect("PSQL Client error")
+        .clone();
 
+    let rows = client
+        .query(
+            "SELECT * FROM custom_questions WHERE guild_id = $1",
+            &[&guild_id]
+        )
+        .await
+        .expect("Error querying database");
+
+    rows
+}
 
 async fn get_random_custom_question(guild_id: String) -> String {
     // Get random custom question from database and return it
