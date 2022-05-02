@@ -25,7 +25,7 @@ impl TypeMapKey for DataClient {
 
 // General framework for commands
 #[group]
-#[commands(help, set_qotd_channel, qotd_channel, qotd, custom_qotd, submit_qotd, delete_question)]
+#[commands(help, set_qotd_channel, qotd_channel, qotd, custom_qotd, submit_qotd, delete_question, customs)]
 struct General;
 
 struct MessageHandler;
@@ -511,4 +511,49 @@ async fn delete_question(ctx: &Context, msg: &Message) -> CommandResult {
     Ok(())
 }
 
+#[command]
+async fn customs(ctx: &Context, msg: &Message) -> CommandResult {
+    let guild_id = msg.guild_id.unwrap();
+    // Getting all questions
+    let question_list = get_list_custom_questions(guild_id.to_string(), ctx).await;
+
+    // If there are custom questions saved
+    if question_list.len() > 0 {
+        // Formatting vector for printing
+        let length = question_list.len();
+
+        let mut pretty_list = "ID - Question\n".to_string();
+        // Putting the questions onto the list
+        for i in 0..length {
+            let qid: i32 = question_list[i].get(0);
+            let string: String = question_list[i].get(2);
+            pretty_list = format!("{}{} - {} \n", pretty_list, qid, string)
+        }
+        // Listing questions in message
+        msg.channel_id
+            .send_message(ctx, |m| {
+                m
+                    .content(format!("<@{}> Here's a list of all saved custom questions",
+                                     msg.author.id
+                    ))
+                    .embed(|embed| {
+                        embed
+                            .title("Questions")
+                            .description(pretty_list)
+                            .color(Color::RED)
+                    })
+            })
+            .await?;
+    }
+    else {
+        msg.reply(ctx,"No custom questions found!").await?;
+    }
+
+
+    Ok(())
+}
+
 // TODO: Add list of customs command with borrowed logic from delete
+// TODO: Ability to add role to ping (similar to guild_id checks)
+// TODO: Message looks ok
+// TODO: Timer and permissions
