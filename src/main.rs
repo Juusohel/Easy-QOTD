@@ -1,12 +1,13 @@
 use std::sync::Arc;
 use std::{env, fs, io};
 
+
 use serenity::framework::standard::{
     macros::{command, group},
     CommandResult, StandardFramework,
 };
 
-use serenity::utils::{Color, parse_channel};
+use serenity::utils::{Color, parse_channel, parse_message_url};
 use serenity::{async_trait, Error, model::{channel::Message, gateway::Ready}, prelude::*};
 use serenity::model::id::{ChannelId, GuildId};
 
@@ -24,7 +25,7 @@ impl TypeMapKey for DataClient {
 
 // General framework for commands
 #[group]
-#[commands(help, set_qotd_channel, qotd_channel, qotd, custom_qotd, submit_qotd)]
+#[commands(help, set_qotd_channel, qotd_channel, qotd, custom_qotd, submit_qotd, delete_question)]
 struct General;
 
 struct MessageHandler;
@@ -214,7 +215,7 @@ async fn delete_custom_question(guild_id: String, question_id: i32, ctx: &Contex
         .expect("Select Failed");
     if rows.len() > 0 {
         let delete = client.execute(
-            "DELETE FROM custom_questions WHERE question id = $1",
+            "DELETE FROM custom_questions WHERE question_id = $1",
             &[&question_id]
         )
             .await
@@ -409,7 +410,62 @@ async fn submit_qotd(ctx: &Context, msg: &Message) -> CommandResult {
 
 #[command]
 async fn delete_question(ctx: &Context, msg: &Message) -> CommandResult {
+    let guild_id = msg.guild_id.unwrap();
 
+    if msg.content.len() >= 18 {
+        // Parsing id from the message
+        if let Ok(id_to_delete) =  &msg.content[18..].parse::<i32>() {
+            let id_to_delete = id_to_delete;
+            let test = delete_custom_question(guild_id.to_string(), *id_to_delete, ctx).await;
+            if test == 1 {
+                msg.reply(ctx,"Question deleted!").await?;
+            }
+            else {
+                msg.reply(ctx, "Question not found!").await?;
+            }
+        }
+            // If id not able to be parsed
+        else {
+            msg.reply(ctx, "Please enter a valid ID!").await?;
+        }
+    }
+    else {
+        // Getting all questions
+        let question_list = get_list_custom_questions(guild_id.to_string(), ctx).await;
+
+        // If there are custom questions saved
+        if question_list.len() > 0 {
+            // Formatting vector for printing
+            let length = question_list.len();
+
+            let mut pretty_list = "ID - Question\n".to_string();
+            // Putting the questions onto the list
+            for i in 0..length {
+                let qid: i32 = question_list[i].get(0);
+                let string: String = question_list[i].get(2);
+                pretty_list = format!("{}{} - {} \n", pretty_list, qid, string)
+            }
+            // Listing questions in message
+            msg.channel_id
+                .send_message(ctx, |m| {
+                    m
+                        .content(format!("<@{}> Please specify the ID of question",
+                                         msg.author.id
+                        ))
+                        .embed(|embed| {
+                            embed
+                                .title("Questions")
+                                .description(pretty_list)
+                                .color(Color::DARK_BLUE)
+                        })
+                })
+                .await?;
+        }
+        else {
+            msg.reply(ctx,"No custom questions found!").await?;
+        }
+
+    }
 
     Ok(())
 }
