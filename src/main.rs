@@ -248,6 +248,7 @@ async fn get_list_custom_questions(guild_id: String, ctx: &Context) -> Vec<Row> 
     rows
 }
 
+/// Queries the database for a custom question
 async fn get_random_custom_question(guild_id: String, ctx: &Context) -> String {
     // Pulling in psql client
     let read = ctx.data.read().await;
@@ -264,9 +265,16 @@ async fn get_random_custom_question(guild_id: String, ctx: &Context) -> String {
         .await
         .expect("Error querying database");
 
-    let question_string= rows[0].get(0);
+    if rows.len() > 0 {
+        let question_string= rows[0].get(0);
 
-    question_string
+        question_string
+    }
+    else {
+        let question_string = String::from("No custom questions found!");
+        question_string
+    }
+
 
 }
 
