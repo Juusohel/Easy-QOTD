@@ -279,7 +279,7 @@ async fn get_random_custom_question(guild_id: String, ctx: &Context) -> String {
 
 }
 
-
+/// Gets a specific custom question from the database based on id
 async fn get_specific_custom(guild_id: String, question_id: i32, ctx: &Context) -> String {
     // Pulling in psql client
     let read = ctx.data.read().await;
@@ -302,6 +302,53 @@ async fn get_specific_custom(guild_id: String, question_id: i32, ctx: &Context) 
     else {
         String::from("Question does not exist!")
     }
+}
+
+/// Saves a role id to be used to ping into the database.
+/// guild_id is the id of the server the command is called from.
+async fn set_ping_role(guild_id: String, ping_role: String, ctx: &Context) -> Result<u64, tokio_postgres::Error> {
+    // Pulling in psql client
+    let read = ctx.data.read().await;
+    let client = read
+        .get::<DataClient>()
+        .expect("PSQL Client error")
+        .clone();
+
+    let insert = client
+        .execute(
+            "INSERT INTO ping_roles (guild_id, ping_role) VALUES ($1, $2)",
+            &[&guild_id, &ping_role]
+        )
+        .await;
+
+    insert
+}
+
+/// Gets the role id to be used for pinging based on the guild_id
+async fn get_ping_role(guild_id: String, ctx: &Context) -> String{
+    // Pulling in psql client
+    let read = ctx.data.read().await;
+    let client = read
+        .get::<DataClient>()
+        .expect("PSQL Client error")
+        .clone();
+
+    let rows = client
+        .query(
+            "SELECT ping_role FROM ping_roles WHERE guild_id = $1",
+            &[&guild_id]
+        )
+        .await
+        .expect("Error querying database");
+
+    if rows.len() > 0 {
+        rows[0].get(0)
+    }
+    else {
+        //Assuming role ID 0 doesn't exist
+        String::from("0")
+    }
+
 }
 
 #[command]
@@ -553,7 +600,6 @@ async fn customs(ctx: &Context, msg: &Message) -> CommandResult {
     Ok(())
 }
 
-// TODO: Add list of customs command with borrowed logic from delete
 // TODO: Ability to add role to ping (similar to guild_id checks)
 // TODO: Message looks ok
 // TODO: Timer and permissions
