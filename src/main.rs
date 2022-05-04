@@ -1,5 +1,6 @@
 use std::sync::Arc;
 use std::{env, fs, io};
+use std::fmt::format;
 
 
 use serenity::framework::standard::{
@@ -7,7 +8,7 @@ use serenity::framework::standard::{
     CommandResult, StandardFramework,
 };
 
-use serenity::utils::{Color, parse_channel, parse_message_url};
+use serenity::utils::{Color, parse_channel, parse_message_url, parse_role};
 use serenity::{async_trait, Error, model::{channel::Message, gateway::Ready}, prelude::*};
 use serenity::model::id::{ChannelId, GuildId};
 
@@ -25,7 +26,7 @@ impl TypeMapKey for DataClient {
 
 // General framework for commands
 #[group]
-#[commands(help, set_qotd_channel, qotd_channel, qotd, custom_qotd, submit_qotd, delete_question, customs)]
+#[commands(help, set_qotd_channel, qotd_channel, qotd, custom_qotd, submit_qotd, delete_question, customs, pingrole)]
 struct General;
 
 struct MessageHandler;
@@ -306,6 +307,9 @@ async fn get_specific_custom(guild_id: String, question_id: i32, ctx: &Context) 
 
 /// Saves a role id to be used to ping into the database.
 /// guild_id is the id of the server the command is called from.
+/// 0 is used for no ping
+/// 1 is used for EVERYONE
+/// submitted id is used for specific role
 async fn set_ping_role(guild_id: String, ping_role: String, ctx: &Context) -> Result<u64, tokio_postgres::Error> {
     // Pulling in psql client
     let read = ctx.data.read().await;
@@ -325,6 +329,9 @@ async fn set_ping_role(guild_id: String, ping_role: String, ctx: &Context) -> Re
 }
 
 /// Gets the role id to be used for pinging based on the guild_id
+///  0 is used for no ping
+/// 1 is used for EVERYONE
+/// submitted id is used for specific role
 async fn get_ping_role(guild_id: String, ctx: &Context) -> String{
     // Pulling in psql client
     let read = ctx.data.read().await;
@@ -341,11 +348,12 @@ async fn get_ping_role(guild_id: String, ctx: &Context) -> String{
         .await
         .expect("Error querying database");
 
+    // Return the ping role as string
     if rows.len() > 0 {
         rows[0].get(0)
     }
     else {
-        //Assuming role ID 0 doesn't exist
+        //Return 0 if there's no ping role assigned
         String::from("0")
     }
 
@@ -600,6 +608,70 @@ async fn customs(ctx: &Context, msg: &Message) -> CommandResult {
     Ok(())
 }
 
+/// Command to set ping role
+#[command]
+async fn pingrole(ctx: &Context, msg: &Message) -> CommandResult {
+    let guild_id = msg.guild_id.unwrap();
+    let mut current_role = get_ping_role(guild_id.to_string(),ctx).await;
+
+    // Checking if there's parameters in the command
+    if msg.content.len() >= 11 {
+        let parameter = &msg.content[11..];
+
+        // If role parameter is one of the preset options
+        if parameter == "1" || parameter == "0" {
+            if let Ok(_) = set_ping_role(guild_id.to_string(), String::from(parameter), ctx).await {
+                msg.reply(ctx, "Ping role updated!").await?;
+            }
+            else {
+                msg.reply(ctx, "Something went wrong!").await?;
+            }
+        }
+        // Else check whether the role is valid, and submit it if it is
+        else {
+            // If role is a valid role, submit it to the database
+            if let Some(role) = parse_role(parameter) {
+                if let Ok(_) = set_ping_role(guild_id.to_string(), role.to_string(), ctx).await {
+                    msg.reply(ctx, "Ping role updated!").await?;
+                }
+                else {
+                    msg.reply(ctx, "Something went wrong!").await?;
+                }
+            }
+            else {
+                msg.reply(ctx, "Not a valid role!").await?;
+            }
+        }
+    }
+    // If no parameters, send default help message
+    else {
+        // Formatting current role to taggable form if it's not 0 or 1
+        if (current_role != String::from("1")) && (current_role != String::from("0")) {
+            // No need to check if the role is a valid role, validity is checked on submission to the database.
+            current_role = format!("<@&{}>", current_role);
+        }
+
+        msg.channel_id.send_message(ctx, |m| {
+            m
+                .content(format!(
+                    "<@{}> Use this command to set the role to be pinged when posting a qotd \n \
+                    Current setting is {}",
+                    msg.author.id,
+                    current_role
+                ))
+                .embed(|embed| {
+                    embed
+                        .title("Parameters")
+                        .description("<role> - Specific role \n 1 - Everyone \n 0 - Off (default)")
+                })
+        })
+            .await?;
+    }
+
+    Ok(())
+}
+
 // TODO: Ability to add role to ping (similar to guild_id checks)
 // TODO: Message looks ok
+// TODO: Commands better looking (change the message variable thing)
 // TODO: Timer and permissions
