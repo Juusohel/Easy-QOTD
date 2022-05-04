@@ -643,5 +643,3 @@ async fn qotd_ping_role(ctx: &Context, msg: &Message) -> CommandResult {
     Ok(())
 }
 
-// TODO: permissions
-// TODO: help
