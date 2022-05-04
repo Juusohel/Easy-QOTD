@@ -27,6 +27,7 @@ impl TypeMapKey for DataClient {
 
 // General framework for commands
 #[group]
+#[allowed_roles(qotd_admin)]
 #[commands(
     help,
     set_qotd_channel,
