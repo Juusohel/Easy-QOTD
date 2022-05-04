@@ -1,6 +1,6 @@
 use std::sync::Arc;
-use std::{env, fs, io};
-use std::fmt::format;
+use std::env;
+
 
 
 use serenity::framework::standard::{
@@ -8,11 +8,11 @@ use serenity::framework::standard::{
     CommandResult, StandardFramework,
 };
 
-use serenity::utils::{Color, parse_channel, parse_message_url, parse_role};
-use serenity::{async_trait, Error, model::{channel::Message, gateway::Ready}, prelude::*};
-use serenity::model::id::{ChannelId, GuildId};
+use serenity::utils::{Color, parse_channel, parse_role};
+use serenity::{async_trait, model::{channel::Message, gateway::Ready}, prelude::*};
+use serenity::model::id::ChannelId;
 
-use tokio_postgres::{NoTls, Row, RowStream};
+use tokio_postgres::{NoTls, Row};
 
 
 // Container for psql client
@@ -26,7 +26,7 @@ impl TypeMapKey for DataClient {
 
 // General framework for commands
 #[group]
-#[commands(help, set_qotd_channel, qotd_channel, qotd, custom_qotd, submit_qotd, delete_question, customs, pingrole)]
+#[commands(help, set_qotd_channel, qotd_channel, qotd, custom_qotd, submit_qotd, delete_question, customs, qotd_ping_role)]
 struct General;
 
 struct MessageHandler;
@@ -121,7 +121,7 @@ async fn get_channel_id(guild_id: String, ctx: &Context) -> String {
         .expect("PSQL Client error")
         .clone();
 
-    let mut channel_id: String;
+    let channel_id: String;
     let rows = client
         .query(
             "SELECT channel_id FROM channels WHERE guild_id = $1",
@@ -215,7 +215,7 @@ async fn delete_custom_question(guild_id: String, question_id: i32, ctx: &Contex
         .await
         .expect("Select Failed");
     if rows.len() > 0 {
-        let delete = client.execute(
+        let _delete = client.execute(
             "DELETE FROM custom_questions WHERE question_id = $1",
             &[&question_id]
         )
@@ -383,7 +383,7 @@ async fn format_string_for_pings(ping_role: String, question: String) -> String 
 
 #[command]
 async fn help(ctx: &Context, msg: &Message) -> CommandResult {
-    println!("I'm help lmao");
+    msg.reply(ctx, "I am help").await?;
 
     Ok(())
 }
@@ -635,13 +635,13 @@ async fn customs(ctx: &Context, msg: &Message) -> CommandResult {
 
 /// Command to set ping role
 #[command]
-async fn pingrole(ctx: &Context, msg: &Message) -> CommandResult {
+async fn qotd_ping_role(ctx: &Context, msg: &Message) -> CommandResult {
     let guild_id = msg.guild_id.unwrap();
     let mut current_role = get_ping_role(guild_id.to_string(),ctx).await;
 
     // Checking if there's parameters in the command
-    if msg.content.len() >= 11 {
-        let parameter = &msg.content[11..];
+    if msg.content.len() >= 17 {
+        let parameter = &msg.content[17..];
 
         // If role parameter is one of the preset options
         if parameter == "1" || parameter == "0" {
@@ -696,7 +696,6 @@ async fn pingrole(ctx: &Context, msg: &Message) -> CommandResult {
     Ok(())
 }
 
-// TODO: Ability to add role to ping (similar to guild_id checks)
-// TODO: Message looks ok
-// TODO: Commands better looking (change the message variable thing)
-// TODO: Timer and permissions
+
+// TODO: permissions
+// TODO: help
