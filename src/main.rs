@@ -318,14 +318,18 @@ async fn set_ping_role(guild_id: String, ping_role: String, ctx: &Context) -> Re
         .expect("PSQL Client error")
         .clone();
 
-    let insert = client
+    let upsert = client
         .execute(
-            "INSERT INTO ping_roles (guild_id, ping_role) VALUES ($1, $2)",
+            "INSERT INTO ping_roles (guild_id, ping_role)
+            VALUES ($1, $2)
+            ON CONFLICT (guild_id)
+            DO
+            UPDATE SET ping_role = EXCLUDED.ping_role",
             &[&guild_id, &ping_role]
         )
         .await;
 
-    insert
+    upsert
 }
 
 /// Gets the role id to be used for pinging based on the guild_id
