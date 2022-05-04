@@ -1,19 +1,20 @@
-use std::sync::Arc;
 use std::env;
-
-
+use std::sync::Arc;
 
 use serenity::framework::standard::{
     macros::{command, group},
     CommandResult, StandardFramework,
 };
 
-use serenity::utils::{Color, parse_channel, parse_role};
-use serenity::{async_trait, model::{channel::Message, gateway::Ready}, prelude::*};
 use serenity::model::id::ChannelId;
+use serenity::utils::{parse_channel, parse_role, Color};
+use serenity::{
+    async_trait,
+    model::{channel::Message, gateway::Ready},
+    prelude::*,
+};
 
 use tokio_postgres::{NoTls, Row};
-
 
 // Container for psql client
 struct DataClient {
@@ -26,7 +27,17 @@ impl TypeMapKey for DataClient {
 
 // General framework for commands
 #[group]
-#[commands(help, set_qotd_channel, qotd_channel, qotd, custom_qotd, submit_qotd, delete_question, customs, qotd_ping_role)]
+#[commands(
+    help,
+    set_qotd_channel,
+    qotd_channel,
+    qotd,
+    custom_qotd,
+    submit_qotd,
+    delete_question,
+    customs,
+    qotd_ping_role
+)]
 struct General;
 
 struct MessageHandler;
@@ -40,9 +51,7 @@ impl EventHandler for MessageHandler {
 
 #[tokio::main]
 async fn main() {
-
-    let token = env::var("DISCORD_TOKEN")
-        .expect("Discord token not found");
+    let token = env::var("DISCORD_TOKEN").expect("Discord token not found");
 
     // Database settings from environment variable.
     // Format: host= <> dbname= <> user= <> password= <>
@@ -82,18 +91,18 @@ async fn main() {
     if let Err(e) = discord_client.start().await {
         println!("Starting client error {}", e)
     }
-
- }
+}
 
 /// Setting the channel id from the database for the server id in question
 /// guild_id is from parsed within the command.
 /// channel_id: String - Channel id to be set in the database
-async fn set_channel_id(channel_id: String, guild_id: String, ctx: &Context) -> Result<u64, tokio_postgres::Error> {
+async fn set_channel_id(
+    channel_id: String,
+    guild_id: String,
+    ctx: &Context,
+) -> Result<u64, tokio_postgres::Error> {
     let read = ctx.data.read().await;
-    let client = read
-        .get::<DataClient>()
-        .expect("PSQL Client error")
-        .clone();
+    let client = read.get::<DataClient>().expect("PSQL Client error").clone();
 
     // Assuming the channel ID is a valid one, parsed at command level
     // Upserting into the database
@@ -116,28 +125,21 @@ async fn set_channel_id(channel_id: String, guild_id: String, ctx: &Context) -> 
 async fn get_channel_id(guild_id: String, ctx: &Context) -> String {
     // Pulling in psql client
     let read = ctx.data.read().await;
-    let client = read
-        .get::<DataClient>()
-        .expect("PSQL Client error")
-        .clone();
+    let client = read.get::<DataClient>().expect("PSQL Client error").clone();
 
     let channel_id: String;
     let rows = client
         .query(
             "SELECT channel_id FROM channels WHERE guild_id = $1",
-            &[&guild_id]
+            &[&guild_id],
         )
         .await
         .expect("Error querying database");
     let channel_string;
     if rows.len() > 0 {
         channel_id = rows[0].get(0);
-        channel_string = format!(
-            "<#{}>",
-            channel_id
-        );
-    }
-    else {
+        channel_string = format!("<#{}>", channel_id);
+    } else {
         channel_string = String::from("0");
     }
     channel_string
@@ -147,11 +149,7 @@ async fn get_channel_id(guild_id: String, ctx: &Context) -> String {
 async fn get_random_question(ctx: &Context) -> String {
     // Pulling in psql client
     let read = ctx.data.read().await;
-    let client = read
-        .get::<DataClient>()
-        .expect("PSQL Client error")
-        .clone();
-
+    let client = read.get::<DataClient>().expect("PSQL Client error").clone();
 
     // Getting a random entry from the database by querying the database with random order and displaying one.
     // NOTE: This is rather inefficient because the function in psql is slow, and not exactly efficient
@@ -160,32 +158,30 @@ async fn get_random_question(ctx: &Context) -> String {
     let rows = client
         .query(
             "SELECT question_string FROM questions WHERE in_use = $1 ORDER BY random() LIMIT 1",
-            &[&true]
+            &[&true],
         )
         .await
         .expect("Error querying database");
 
-    let question_string= rows[0].get(0);
+    let question_string = rows[0].get(0);
 
     question_string
-
-
-
 }
 
 /// Adds a custom question to the database with the associated guild_id
-async fn add_custom_question(guild_id: String, question: String, ctx: &Context) -> Result<u64, tokio_postgres::Error> {
+async fn add_custom_question(
+    guild_id: String,
+    question: String,
+    ctx: &Context,
+) -> Result<u64, tokio_postgres::Error> {
     // Pulling in psql client
     let read = ctx.data.read().await;
-    let client = read
-        .get::<DataClient>()
-        .expect("PSQL Client error")
-        .clone();
+    let client = read.get::<DataClient>().expect("PSQL Client error").clone();
 
     let insert = client
         .execute(
             "INSERT INTO custom_questions (guild_id, question_string) VALUES ($1, $2)",
-            &[&guild_id, &question]
+            &[&guild_id, &question],
         )
         .await;
 
@@ -200,49 +196,42 @@ async fn add_custom_question(guild_id: String, question: String, ctx: &Context) 
 async fn delete_custom_question(guild_id: String, question_id: i32, ctx: &Context) -> i32 {
     // Pulling in psql client
     let read = ctx.data.read().await;
-    let client = read
-        .get::<DataClient>()
-        .expect("PSQL Client error")
-        .clone();
+    let client = read.get::<DataClient>().expect("PSQL Client error").clone();
 
     // Checking if a question with the guild_id of the requesting server exists, if it exists, delete the question.
     // This prevents from other servers deleting each others questions.
     let rows = client
         .query(
             "SELECT * FROM custom_questions WHERE guild_id = $1 AND question_id = $2",
-            &[&guild_id, &question_id]
+            &[&guild_id, &question_id],
         )
         .await
         .expect("Select Failed");
     if rows.len() > 0 {
-        let _delete = client.execute(
-            "DELETE FROM custom_questions WHERE question_id = $1",
-            &[&question_id]
-        )
+        let _delete = client
+            .execute(
+                "DELETE FROM custom_questions WHERE question_id = $1",
+                &[&question_id],
+            )
             .await
             .expect("Delete failed");
 
         1
-    }
-    else {
+    } else {
         0
     }
-
 }
 
 /// Gets all the questions submitted by the guild_id and returns vector of rows
 async fn get_list_custom_questions(guild_id: String, ctx: &Context) -> Vec<Row> {
     // Pulling in psql client
     let read = ctx.data.read().await;
-    let client = read
-        .get::<DataClient>()
-        .expect("PSQL Client error")
-        .clone();
+    let client = read.get::<DataClient>().expect("PSQL Client error").clone();
 
     let rows = client
         .query(
             "SELECT * FROM custom_questions WHERE guild_id = $1",
-            &[&guild_id]
+            &[&guild_id],
         )
         .await
         .expect("Error querying database");
@@ -254,10 +243,7 @@ async fn get_list_custom_questions(guild_id: String, ctx: &Context) -> Vec<Row> 
 async fn get_random_custom_question(guild_id: String, ctx: &Context) -> String {
     // Pulling in psql client
     let read = ctx.data.read().await;
-    let client = read
-        .get::<DataClient>()
-        .expect("PSQL Client error")
-        .clone();
+    let client = read.get::<DataClient>().expect("PSQL Client error").clone();
 
     let rows = client
         .query(
@@ -268,39 +254,32 @@ async fn get_random_custom_question(guild_id: String, ctx: &Context) -> String {
         .expect("Error querying database");
 
     if rows.len() > 0 {
-        let question_string= rows[0].get(0);
+        let question_string = rows[0].get(0);
 
         question_string
-    }
-    else {
+    } else {
         let question_string = String::from("No custom questions found!");
         question_string
     }
-
-
 }
 
 /// Gets a specific custom question from the database based on id
 async fn get_specific_custom(guild_id: String, question_id: i32, ctx: &Context) -> String {
     // Pulling in psql client
     let read = ctx.data.read().await;
-    let client = read
-        .get::<DataClient>()
-        .expect("PSQL Client error")
-        .clone();
+    let client = read.get::<DataClient>().expect("PSQL Client error").clone();
 
     let rows = client
         .query(
             "SELECT question_string FROM custom_questions WHERE guild_id = $1 AND question_id = $2",
-            &[&guild_id, &question_id]
+            &[&guild_id, &question_id],
         )
         .await
         .expect("Error querying database");
 
     if rows.len() > 0 {
         rows[0].get(0)
-    }
-    else {
+    } else {
         String::from("Question does not exist!")
     }
 }
@@ -310,13 +289,14 @@ async fn get_specific_custom(guild_id: String, question_id: i32, ctx: &Context) 
 /// 0 is used for no ping
 /// 1 is used for EVERYONE
 /// submitted id is used for specific role
-async fn set_ping_role(guild_id: String, ping_role: String, ctx: &Context) -> Result<u64, tokio_postgres::Error> {
+async fn set_ping_role(
+    guild_id: String,
+    ping_role: String,
+    ctx: &Context,
+) -> Result<u64, tokio_postgres::Error> {
     // Pulling in psql client
     let read = ctx.data.read().await;
-    let client = read
-        .get::<DataClient>()
-        .expect("PSQL Client error")
-        .clone();
+    let client = read.get::<DataClient>().expect("PSQL Client error").clone();
 
     let upsert = client
         .execute(
@@ -325,7 +305,7 @@ async fn set_ping_role(guild_id: String, ping_role: String, ctx: &Context) -> Re
             ON CONFLICT (guild_id)
             DO
             UPDATE SET ping_role = EXCLUDED.ping_role",
-            &[&guild_id, &ping_role]
+            &[&guild_id, &ping_role],
         )
         .await;
 
@@ -336,18 +316,15 @@ async fn set_ping_role(guild_id: String, ping_role: String, ctx: &Context) -> Re
 ///  0 is used for no ping
 /// 1 is used for EVERYONE
 /// submitted id is used for specific role
-async fn get_ping_role(guild_id: String, ctx: &Context) -> String{
+async fn get_ping_role(guild_id: String, ctx: &Context) -> String {
     // Pulling in psql client
     let read = ctx.data.read().await;
-    let client = read
-        .get::<DataClient>()
-        .expect("PSQL Client error")
-        .clone();
+    let client = read.get::<DataClient>().expect("PSQL Client error").clone();
 
     let rows = client
         .query(
             "SELECT ping_role FROM ping_roles WHERE guild_id = $1",
-            &[&guild_id]
+            &[&guild_id],
         )
         .await
         .expect("Error querying database");
@@ -355,14 +332,11 @@ async fn get_ping_role(guild_id: String, ctx: &Context) -> String{
     // Return the ping role as string
     if rows.len() > 0 {
         rows[0].get(0)
-    }
-    else {
+    } else {
         //Return 0 if there's no ping role assigned
         String::from("0")
     }
-
 }
-
 
 /// Appends the correct ping to the message based on the ping_role parameter
 /// Returns completed string
@@ -370,11 +344,9 @@ async fn format_string_for_pings(ping_role: String, question: String) -> String 
     let question_string;
     if ping_role == String::from("0") {
         question_string = format!("{}", question);
-    }
-    else if ping_role == String::from("1") {
-        question_string = format!("@everyone {}" , question);
-    }
-    else {
+    } else if ping_role == String::from("1") {
+        question_string = format!("@everyone {}", question);
+    } else {
         // Role validity checked when it is saved to the database
         question_string = format!("<@&{}> {}", ping_role, question);
     }
@@ -401,8 +373,7 @@ async fn set_qotd_channel(ctx: &Context, msg: &Message) -> CommandResult {
             // Calling function to set the the stuff to database
             set_channel_id(channel_id.to_string(), guild_id.to_string(), ctx).await?;
             msg.reply(ctx, "Channel set!").await?;
-        }
-        else {
+        } else {
             msg.reply(ctx, "Not a valid channel!").await?;
         }
     }
@@ -410,7 +381,6 @@ async fn set_qotd_channel(ctx: &Context, msg: &Message) -> CommandResult {
     else {
         msg.reply(ctx, "Not a valid channel!").await?;
     }
-
 
     Ok(())
 }
@@ -428,10 +398,10 @@ async fn qotd_channel(ctx: &Context, msg: &Message) -> CommandResult {
 
     // Fails if string was 0 and there was no result. Please don't judge me for this solution.
     if let Some(_cid) = parse_channel(&channel_id) {
-        msg.reply(ctx, format!("Qotd channel is set to {}", channel_id)).await?;
-    }
-    else {
-        msg.reply(ctx ,"Channel not set!").await?;
+        msg.reply(ctx, format!("Qotd channel is set to {}", channel_id))
+            .await?;
+    } else {
+        msg.reply(ctx, "Channel not set!").await?;
     }
 
     Ok(())
@@ -445,46 +415,35 @@ async fn qotd(ctx: &Context, msg: &Message) -> CommandResult {
     let ping_role = get_ping_role(guild_id.to_string(), ctx).await;
     let question_string = format_string_for_pings(ping_role, question).await;
 
-
-
     if let Some(cid) = parse_channel(&channel_id) {
         // Sending message to the channel assigned to the server
         let channel = ChannelId(cid);
-        channel.send_message(ctx, |message| {
-            message
-                .content(question_string)
-        })
+        channel
+            .send_message(ctx, |message| message.content(question_string))
             .await?;
-    }
-    else {
-        msg.reply(ctx ,"Channel not set!").await?;
+    } else {
+        msg.reply(ctx, "Channel not set!").await?;
     }
 
     Ok(())
-
-
 }
 
 #[command]
 async fn custom_qotd(ctx: &Context, msg: &Message) -> CommandResult {
     let guild_id = msg.guild_id.unwrap();
     let custom_question;
-    let channel_id = get_channel_id(guild_id.to_string(),ctx).await;
+    let channel_id = get_channel_id(guild_id.to_string(), ctx).await;
     let ping_role = get_ping_role(guild_id.to_string(), ctx).await;
 
-
     if msg.content.len() >= 14 {
-        if let Ok(id_to_use) =  &msg.content[14..].parse::<i32>() {
+        if let Ok(id_to_use) = &msg.content[14..].parse::<i32>() {
             let id_to_use = *id_to_use;
             custom_question = get_specific_custom(guild_id.to_string(), id_to_use, ctx).await;
-        }
-        else {
+        } else {
             msg.reply(ctx, "Not a valid question ID").await?;
             return Ok(());
         }
-
-    }
-    else {
+    } else {
         custom_question = get_random_custom_question(guild_id.to_string(), ctx).await;
     }
 
@@ -493,14 +452,11 @@ async fn custom_qotd(ctx: &Context, msg: &Message) -> CommandResult {
     if let Some(channel) = parse_channel(&channel_id) {
         // Sending message to the channel assigned to the server
         let channel = ChannelId(channel);
-        channel.send_message(ctx, |message| {
-            message
-                .content(question_string)
-        })
+        channel
+            .send_message(ctx, |message| message.content(question_string))
             .await?;
-    }
-    else {
-        msg.reply(ctx ,"Channel not set!").await?;
+    } else {
+        msg.reply(ctx, "Channel not set!").await?;
     }
 
     Ok(())
@@ -515,15 +471,15 @@ async fn submit_qotd(ctx: &Context, msg: &Message) -> CommandResult {
     // If message is valid
     if msg.content.len() >= 14 {
         user_submission = &msg.content[14..];
-        if let Ok(_s) = add_custom_question(guild_id.to_string(), user_submission.to_string(), ctx).await {
-            msg.reply(ctx,"Question Submitted").await?;
-        }
-        else {
+        if let Ok(_s) =
+            add_custom_question(guild_id.to_string(), user_submission.to_string(), ctx).await
+        {
+            msg.reply(ctx, "Question Submitted").await?;
+        } else {
             msg.reply(ctx, "Something went wrong!").await?;
         }
-    }
-    else {
-        msg.reply(ctx,"Question not accepted").await?;
+    } else {
+        msg.reply(ctx, "Question not accepted").await?;
     }
 
     Ok(())
@@ -535,22 +491,20 @@ async fn delete_question(ctx: &Context, msg: &Message) -> CommandResult {
 
     if msg.content.len() >= 18 {
         // Parsing id from the message
-        if let Ok(id_to_delete) =  &msg.content[18..].parse::<i32>() {
+        if let Ok(id_to_delete) = &msg.content[18..].parse::<i32>() {
             let id_to_delete = id_to_delete;
             let test = delete_custom_question(guild_id.to_string(), *id_to_delete, ctx).await;
             if test == 1 {
-                msg.reply(ctx,"Question deleted!").await?;
-            }
-            else {
+                msg.reply(ctx, "Question deleted!").await?;
+            } else {
                 msg.reply(ctx, "Question not found!").await?;
             }
         }
-            // If id not able to be parsed
+        // If id not able to be parsed
         else {
             msg.reply(ctx, "Please enter a valid ID!").await?;
         }
-    }
-    else {
+    } else {
         // Getting all questions
         let question_list = get_list_custom_questions(guild_id.to_string(), ctx).await;
 
@@ -569,23 +523,21 @@ async fn delete_question(ctx: &Context, msg: &Message) -> CommandResult {
             // Listing questions in message
             msg.channel_id
                 .send_message(ctx, |m| {
-                    m
-                        .content(format!("<@{}> Please specify the ID of question",
-                                         msg.author.id
-                        ))
-                        .embed(|embed| {
-                            embed
-                                .title("Questions")
-                                .description(pretty_list)
-                                .color(Color::DARK_BLUE)
-                        })
+                    m.content(format!(
+                        "<@{}> Please specify the ID of question",
+                        msg.author.id
+                    ))
+                    .embed(|embed| {
+                        embed
+                            .title("Questions")
+                            .description(pretty_list)
+                            .color(Color::DARK_BLUE)
+                    })
                 })
                 .await?;
+        } else {
+            msg.reply(ctx, "No custom questions found!").await?;
         }
-        else {
-            msg.reply(ctx,"No custom questions found!").await?;
-        }
-
     }
 
     Ok(())
@@ -612,23 +564,21 @@ async fn customs(ctx: &Context, msg: &Message) -> CommandResult {
         // Listing questions in message
         msg.channel_id
             .send_message(ctx, |m| {
-                m
-                    .content(format!("<@{}> Here's a list of all saved custom questions",
-                                     msg.author.id
-                    ))
-                    .embed(|embed| {
-                        embed
-                            .title("Questions")
-                            .description(pretty_list)
-                            .color(Color::RED)
-                    })
+                m.content(format!(
+                    "<@{}> Here's a list of all saved custom questions",
+                    msg.author.id
+                ))
+                .embed(|embed| {
+                    embed
+                        .title("Questions")
+                        .description(pretty_list)
+                        .color(Color::RED)
+                })
             })
             .await?;
+    } else {
+        msg.reply(ctx, "No custom questions found!").await?;
     }
-    else {
-        msg.reply(ctx,"No custom questions found!").await?;
-    }
-
 
     Ok(())
 }
@@ -637,7 +587,7 @@ async fn customs(ctx: &Context, msg: &Message) -> CommandResult {
 #[command]
 async fn qotd_ping_role(ctx: &Context, msg: &Message) -> CommandResult {
     let guild_id = msg.guild_id.unwrap();
-    let mut current_role = get_ping_role(guild_id.to_string(),ctx).await;
+    let mut current_role = get_ping_role(guild_id.to_string(), ctx).await;
 
     // Checking if there's parameters in the command
     if msg.content.len() >= 17 {
@@ -647,8 +597,7 @@ async fn qotd_ping_role(ctx: &Context, msg: &Message) -> CommandResult {
         if parameter == "1" || parameter == "0" {
             if let Ok(_) = set_ping_role(guild_id.to_string(), String::from(parameter), ctx).await {
                 msg.reply(ctx, "Ping role updated!").await?;
-            }
-            else {
+            } else {
                 msg.reply(ctx, "Something went wrong!").await?;
             }
         }
@@ -658,12 +607,10 @@ async fn qotd_ping_role(ctx: &Context, msg: &Message) -> CommandResult {
             if let Some(role) = parse_role(parameter) {
                 if let Ok(_) = set_ping_role(guild_id.to_string(), role.to_string(), ctx).await {
                     msg.reply(ctx, "Ping role updated!").await?;
-                }
-                else {
+                } else {
                     msg.reply(ctx, "Something went wrong!").await?;
                 }
-            }
-            else {
+            } else {
                 msg.reply(ctx, "Not a valid role!").await?;
             }
         }
@@ -676,26 +623,24 @@ async fn qotd_ping_role(ctx: &Context, msg: &Message) -> CommandResult {
             current_role = format!("<@&{}>", current_role);
         }
         // Crafting message
-        msg.channel_id.send_message(ctx, |m| {
-            m
-                .content(format!(
+        msg.channel_id
+            .send_message(ctx, |m| {
+                m.content(format!(
                     "<@{}> Use this command to set the role to be pinged when posting a qotd \n \
                     Current setting is {}",
-                    msg.author.id,
-                    current_role
+                    msg.author.id, current_role
                 ))
                 .embed(|embed| {
                     embed
                         .title("Parameters")
                         .description("<role> - Specific role \n 1 - Everyone \n 0 - Off (default)")
                 })
-        })
+            })
             .await?;
     }
 
     Ok(())
 }
-
 
 // TODO: permissions
 // TODO: help
