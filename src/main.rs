@@ -363,6 +363,24 @@ async fn get_ping_role(guild_id: String, ctx: &Context) -> String{
 
 }
 
+
+/// Appends the correct ping to the message based on the ping_role parameter
+/// Returns completed string
+async fn format_string_for_pings(ping_role: String, question: String) -> String {
+    let question_string;
+    if ping_role == String::from("0") {
+        question_string = format!("{}", question);
+    }
+    else if ping_role == String::from("1") {
+        question_string = format!("@everyone {}" , question);
+    }
+    else {
+        // Role validity checked when it is saved to the database
+        question_string = format!("<@&{}> {}", ping_role, question);
+    }
+    question_string
+}
+
 #[command]
 async fn help(ctx: &Context, msg: &Message) -> CommandResult {
     println!("I'm help lmao");
@@ -424,15 +442,17 @@ async fn qotd(ctx: &Context, msg: &Message) -> CommandResult {
     let guild_id = msg.guild_id.unwrap();
     let question = get_random_question(ctx).await;
     let channel_id = get_channel_id(guild_id.to_string(), ctx).await;
+    let ping_role = get_ping_role(guild_id.to_string(), ctx).await;
+    let question_string = format_string_for_pings(ping_role, question).await;
+
+
 
     if let Some(cid) = parse_channel(&channel_id) {
         // Sending message to the channel assigned to the server
         let channel = ChannelId(cid);
         channel.send_message(ctx, |message| {
             message
-                .content(format!(
-                    "{}", question
-                ))
+                .content(question_string)
         })
             .await?;
     }
@@ -450,6 +470,7 @@ async fn custom_qotd(ctx: &Context, msg: &Message) -> CommandResult {
     let guild_id = msg.guild_id.unwrap();
     let custom_question;
     let channel_id = get_channel_id(guild_id.to_string(),ctx).await;
+    let ping_role = get_ping_role(guild_id.to_string(), ctx).await;
 
 
     if msg.content.len() >= 14 {
@@ -467,14 +488,14 @@ async fn custom_qotd(ctx: &Context, msg: &Message) -> CommandResult {
         custom_question = get_random_custom_question(guild_id.to_string(), ctx).await;
     }
 
+    let question_string = format_string_for_pings(ping_role, custom_question).await;
+
     if let Some(channel) = parse_channel(&channel_id) {
         // Sending message to the channel assigned to the server
         let channel = ChannelId(channel);
         channel.send_message(ctx, |message| {
             message
-                .content(format!(
-                    "{}", custom_question
-                ))
+                .content(question_string)
         })
             .await?;
     }
@@ -654,7 +675,7 @@ async fn pingrole(ctx: &Context, msg: &Message) -> CommandResult {
             // No need to check if the role is a valid role, validity is checked on submission to the database.
             current_role = format!("<@&{}>", current_role);
         }
-
+        // Crafting message
         msg.channel_id.send_message(ctx, |m| {
             m
                 .content(format!(
