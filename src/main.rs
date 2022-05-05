@@ -388,11 +388,24 @@ async fn set_qotd_channel(ctx: &Context, msg: &Message) -> CommandResult {
     if msg.content.len() >= 19 {
         // Parsing channel id from the user message
         if let Some(cid) = parse_channel(&msg.content[19..]) {
-            let channel_id = cid;
+            let channel_id_slice = cid;
 
-            // Calling function to set the the stuff to database
-            set_channel_id(channel_id.to_string(), guild_id.to_string(), ctx).await?;
-            msg.reply(ctx, "Channel set!").await?;
+            // Checking that the channel is in the server.
+            // We safely assume that this command is being called from a server so not handling null
+            let guild_channels = ctx
+                .cache
+                .guild_channels(guild_id)
+                .await
+                .ok_or("Command not being called from a guild?")?;
+            let channel_id = ChannelId(channel_id_slice);
+
+            if guild_channels.contains_key(&channel_id) {
+                // Calling function to set the the stuff to database
+                set_channel_id(channel_id_slice.to_string(), guild_id.to_string(), ctx).await?;
+                msg.reply(ctx, "Channel set!").await?;
+            } else {
+                msg.reply(ctx, "Channel not found on this server!").await?;
+            }
         } else {
             msg.reply(ctx, "Not a valid channel!").await?;
         }
@@ -661,4 +674,3 @@ async fn qotd_ping_role(ctx: &Context, msg: &Message) -> CommandResult {
 
     Ok(())
 }
-
