@@ -1,4 +1,4 @@
-# Simple Question of the Day
+# Easy Question of the Day
 Flexible discord bot for posting questions of the day with possibility for custom questions and more!
 
 ## Features
