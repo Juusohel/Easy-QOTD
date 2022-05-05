@@ -356,7 +356,26 @@ async fn format_string_for_pings(ping_role: String, question: String) -> String 
 
 #[command]
 async fn help(ctx: &Context, msg: &Message) -> CommandResult {
-    msg.reply(ctx, "I am help").await?;
+    msg.channel_id.send_message(ctx, |m| {
+        m
+            .content(format!("<@{}>", msg.author.id))
+            .embed(|embed| {
+                embed
+                    .title("Help")
+                    .description("
+                    **Current command prefix:** q! \n
+                    **qotd** - Sends a random question of the day! \n
+                    **custom_qotd <Optional: id>** - Sends a question of the day from the list of custom questions! \n
+                    **set_qotd_channel** - Sets which channel is used for questions of the day. \n
+                    **qotd_channel** - Lists which channel is currently used for questions of the day.\n
+                    **submit_qotd <question>** - Submit a custom question.\n
+                    **delete_question <id>** - Deletes the specified question from the list of questions.\n
+                    **customs** - Lists all custom questions saved for the server.\n
+                    **qotd_ping_role <0 (default)/1/<role>>** - Sets the ping setting for question of the day. \n
+                    **help** - Brings up this message!")
+                    .color(Color::DARK_GREEN)
+            })
+    }).await?;
 
     Ok(())
 }
