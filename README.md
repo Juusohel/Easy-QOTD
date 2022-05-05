@@ -42,3 +42,4 @@ WIP Features
 
 ## Acknowledgements
 Thanks to DioritePoodle for help with writing default questions
+Thanks to Danny for the bot profile picture.
