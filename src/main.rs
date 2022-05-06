@@ -354,6 +354,30 @@ async fn format_string_for_pings(ping_role: String, question: String) -> String 
     question_string
 }
 
+/// Checks whether the amount of custom question entries in the database is under the limit imposed by the function.
+/// Returns true if the current count is under the limit
+/// Returns false if the current count is over the limit
+async fn is_under_limit(guild_id: String, ctx: &Context) -> bool {
+    // Pulling in psql client
+    let read = ctx.data.read().await;
+    let client = read.get::<DataClient>().expect("PSQL Client error").clone();
+    let limit: i64 = 100; // CUSTOM QUESTION LIMIT
+
+    let rows = client
+        .query(
+            "SELECT COUNT(*) FROM custom_questions WHERE guild_id = $1",
+            &[&guild_id],
+        )
+        .await
+        .expect("psql count failed");
+    let count: i64 = rows[0].get(0);
+    if count >= limit {
+        false
+    } else {
+        true
+    }
+}
+
 #[command]
 async fn help(ctx: &Context, msg: &Message) -> CommandResult {
     msg.channel_id.send_message(ctx, |m| {
@@ -504,12 +528,21 @@ async fn submit_qotd(ctx: &Context, msg: &Message) -> CommandResult {
     // If message is valid
     if msg.content.len() >= 14 {
         user_submission = &msg.content[14..];
-        if let Ok(_s) =
-            add_custom_question(guild_id.to_string(), user_submission.to_string(), ctx).await
-        {
-            msg.reply(ctx, "Question Submitted").await?;
+
+        if is_under_limit(guild_id.to_string(), ctx).await {
+            if let Ok(_s) =
+                add_custom_question(guild_id.to_string(), user_submission.to_string(), ctx).await
+            {
+                msg.reply(ctx, "Question Submitted").await?;
+            } else {
+                msg.reply(ctx, "Something went wrong!").await?;
+            }
         } else {
-            msg.reply(ctx, "Something went wrong!").await?;
+            msg.reply(
+                ctx,
+                "Too many custom questions saved! Please delete some before adding more!",
+            )
+            .await?;
         }
     } else {
         msg.reply(ctx, "Question not accepted").await?;
