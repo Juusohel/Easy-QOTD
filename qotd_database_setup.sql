@@ -22,12 +22,12 @@ CREATE TABLE ping_roles (
 
 CREATE TABLE polls (
     poll_id serial PRIMARY KEY,
-    poll_string varchar NOT NULL,
+    poll_string varchar[] NOT NULL,
     in_use bool NOT NULL
 );
 
 CREATE TABLE custom_polls (
     poll_id serial PRIMARY KEY,
     guild_id varchar NOT NULL,
-    poll_string varchar NOT NULL
+    poll_string varchar[] NOT NULL
 );
