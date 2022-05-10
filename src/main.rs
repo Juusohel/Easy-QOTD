@@ -362,7 +362,7 @@ async fn format_string_for_pings(ping_role: String, message: String) -> String {
 /// Checks whether the amount of custom question entries in the database is under the limit imposed by the function.
 /// Returns true if the current count is under the limit
 /// Returns false if the current count is over the limit
-async fn is_under_limit(guild_id: String, ctx: &Context) -> bool {
+async fn question_is_under_limit(guild_id: String, ctx: &Context) -> bool {
     // Pulling in psql client
     let read = ctx.data.read().await;
     let client = read.get::<DataClient>().expect("PSQL Client error").clone();
@@ -383,6 +383,29 @@ async fn is_under_limit(guild_id: String, ctx: &Context) -> bool {
     }
 }
 
+async fn poll_is_under_limit(guild_id: String, ctx: &Context) -> bool {
+    // Pulling in psql client
+    let read = ctx.data.read().await;
+    let client = read.get::<DataClient>().expect("PSQL Client error").clone();
+    let limit: i64 = 100; // CUSTOM QUESTION LIMIT
+
+    let rows = client
+        .query(
+            "SELECT COUNT(*) FROM custom_polls WHERE guild_id = $1",
+            &[&guild_id],
+        )
+        .await
+        .expect("psql count failed");
+
+    let count: i64 = rows[0].get(0);
+    if count >= limit {
+        false
+    } else {
+        true
+    }
+}
+
+/// Gets a random poll from the database and returns it
 async fn get_random_poll(ctx: &Context) -> Vec<String> {
     // Pulling in psql client
     let read = ctx.data.read().await;
@@ -585,7 +608,7 @@ async fn submit_qotd(ctx: &Context, msg: &Message) -> CommandResult {
     if msg.content.len() >= 14 {
         user_submission = &msg.content[14..];
 
-        if is_under_limit(guild_id.to_string(), ctx).await {
+        if question_is_under_limit(guild_id.to_string(), ctx).await {
             match add_custom_question(guild_id.to_string(), user_submission.to_string(), ctx).await {
                 Ok(_s) => {
                     msg.reply(ctx, "Question Submitted").await?;
@@ -832,7 +855,7 @@ async fn submit_poll(ctx: &Context, msg: &Message) -> CommandResult {
         // If message is in correct format
         if full_poll.len() == 3 {
 
-            if is_under_limit(guild_id.to_string(), ctx).await {
+            if poll_is_under_limit(guild_id.to_string(), ctx).await {
                 match add_custom_poll(guild_id.to_string(), full_poll, ctx).await {
                     Ok(_s) => {
                         msg.reply(ctx, "Poll Submitted").await?;
