@@ -17,6 +17,7 @@ use serenity::{
 };
 
 use tokio_postgres::{NoTls, Row};
+use tokio_postgres::types::ToSql;
 
 // Container for psql client
 struct DataClient {
@@ -40,7 +41,8 @@ impl TypeMapKey for DataClient {
     delete_question,
     customs,
     qotd_ping_role,
-    poll
+    poll,
+    submit_poll
 )]
 struct General;
 
@@ -402,9 +404,12 @@ async fn add_custom_poll(guild_id: String, new_poll: Vec<String>, ctx: &Context)
     let read = ctx.data.read().await;
     let client = read.get::<DataClient>().expect("PSQL Client error").clone();
 
+    println!("{:?}", new_poll);
+
+
     let insert = client
         .execute(
-            "INSERT INTO custom_questions (guild_id, question_string) VALUES ($1, $2)",
+            "INSERT INTO custom_polls (guild_id, poll_string) VALUES ($1, $2)",
             &[&guild_id, &new_poll],
         )
         .await;
@@ -775,3 +780,69 @@ async fn poll(ctx: &Context, msg: &Message) -> CommandResult  {
     Ok(())
 }
 
+#[command]
+async fn submit_poll(ctx: &Context, msg: &Message) -> CommandResult {
+    let guild_id = msg.guild_id.unwrap();
+    let user_submission;
+
+    // Could add regex for bad words etc here.
+    // If message has content
+    if msg.content.len() >= 14 {
+        user_submission = &msg.content[14..];
+        let split = user_submission.split("\n"); // Splitting message to its parts
+
+        // Converting slices to strings
+        let mut full_poll: Vec<String> = vec![];
+        for i in split {
+            full_poll.push(i.to_string());
+        }
+
+        // If message is in correct format
+        if full_poll.len() == 3 {
+
+            if is_under_limit(guild_id.to_string(), ctx).await {
+                if let Ok(_s) =
+                add_custom_poll(guild_id.to_string(), full_poll, ctx).await
+                {
+                    msg.reply(ctx, "Poll Submitted").await?;
+                } else {
+                    msg.reply(ctx, "Something went wrong!").await?;
+                }
+            } else {
+                msg.reply(
+                    ctx,
+                    "Too many custom polls saved! Please delete some before adding more!",
+                )
+                    .await?;
+            }
+        } else {
+            msg.channel_id.send_message(ctx, |message| {
+                message
+                    .content(format!("<@{}> Follow this format when submitting new questions!", msg.author.id))
+                    .embed(|embed|{
+                        embed
+                            .title("Custom poll format")
+                            .description("submit_poll Question\nOption1\nOption2")
+                            .color(Color::DARK_BLUE)
+                    })
+            })
+                .await?;
+        }
+
+    } else {
+        msg.channel_id.send_message(ctx, |message| {
+            message
+                .content(format!("<@{}> Please use correct format!", msg.author.id))
+                .embed(|embed|{
+                    embed
+                        .title("Custom poll format")
+                        .description("submit_poll Question\nOption1\nOption2")
+                        .color(Color::DARK_BLUE)
+                })
+        })
+            .await?;
+    }
+
+    Ok(())
+
+}
