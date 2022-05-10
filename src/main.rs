@@ -452,27 +452,30 @@ async fn set_qotd_channel(ctx: &Context, msg: &Message) -> CommandResult {
     // If message is a valid message
     if msg.content.len() >= 19 {
         // Parsing channel id from the user message
-        if let Some(cid) = parse_channel(&msg.content[19..]) {
-            let channel_id_slice = cid;
+        match parse_channel(&msg.content[19..]) {
+            Some(cid) => {
+                let channel_id_slice = cid;
 
-            // Checking that the channel is in the server.
-            // We safely assume that this command is being called from a server so not handling null
-            let guild_channels = ctx
-                .cache
-                .guild_channels(guild_id)
-                .await
-                .ok_or("Command not being called from a guild?")?;
-            let channel_id = ChannelId(channel_id_slice);
+                // Checking that the channel is in the server.
+                // We safely assume that this command is being called from a server so not handling null
+                let guild_channels = ctx
+                    .cache
+                    .guild_channels(guild_id)
+                    .await
+                    .ok_or("Command not being called from a guild?")?;
+                let channel_id = ChannelId(channel_id_slice);
 
-            if guild_channels.contains_key(&channel_id) {
-                // Calling function to set the the stuff to database
-                set_channel_id(channel_id_slice.to_string(), guild_id.to_string(), ctx).await?;
-                msg.reply(ctx, "Channel set!").await?;
-            } else {
-                msg.reply(ctx, "Channel not found on this server!").await?;
+                if guild_channels.contains_key(&channel_id) {
+                    // Calling function to set the the stuff to database
+                    set_channel_id(channel_id_slice.to_string(), guild_id.to_string(), ctx).await?;
+                    msg.reply(ctx, "Channel set!").await?;
+                } else {
+                    msg.reply(ctx, "Channel not found on this server!").await?;
+                }
             }
-        } else {
-            msg.reply(ctx, "Not a valid channel!").await?;
+            None => {
+                msg.reply(ctx, "Not a valid channel!").await?;
+            }
         }
     }
     // If message isn't long enough or something else broken in it
@@ -495,11 +498,14 @@ async fn qotd_channel(ctx: &Context, msg: &Message) -> CommandResult {
     // which is then used for parse_channel.
 
     // Fails if string was 0 and there was no result. Please don't judge me for this solution.
-    if let Some(_cid) = parse_channel(&channel_id) {
-        msg.reply(ctx, format!("Qotd channel is set to {}", channel_id))
-            .await?;
-    } else {
-        msg.reply(ctx, "Channel not set!").await?;
+    match parse_channel(&channel_id) {
+        Some(_cid) => {
+            msg.reply(ctx, format!("Qotd channel is set to {}", channel_id))
+                .await?;
+        }
+        None => {
+            msg.reply(ctx, "Channel not set!").await?;
+        }
     }
 
     Ok(())
@@ -513,14 +519,17 @@ async fn qotd(ctx: &Context, msg: &Message) -> CommandResult {
     let ping_role = get_ping_role(guild_id.to_string(), ctx).await;
     let question_string = format_string_for_pings(ping_role, question).await;
 
-    if let Some(cid) = parse_channel(&channel_id) {
-        // Sending message to the channel assigned to the server
-        let channel = ChannelId(cid);
-        channel
-            .send_message(ctx, |message| message.content(question_string))
-            .await?;
-    } else {
-        msg.reply(ctx, "Channel not set!").await?;
+    match parse_channel(&channel_id) {
+        Some(cid) => {
+            // Sending message to the channel assigned to the server
+            let channel = ChannelId(cid);
+            channel
+                .send_message(ctx, |message| message.content(question_string))
+                .await?;
+        }
+        None => {
+            msg.reply(ctx, "Channel not set!").await?;
+        }
     }
 
     Ok(())
@@ -534,12 +543,15 @@ async fn custom_qotd(ctx: &Context, msg: &Message) -> CommandResult {
     let ping_role = get_ping_role(guild_id.to_string(), ctx).await;
 
     if msg.content.len() >= 14 {
-        if let Ok(id_to_use) = &msg.content[14..].parse::<i32>() {
-            let id_to_use = *id_to_use;
-            custom_question = get_specific_custom(guild_id.to_string(), id_to_use, ctx).await;
-        } else {
-            msg.reply(ctx, "Not a valid question ID").await?;
-            return Ok(());
+        match &msg.content[14..].parse::<i32>() {
+            Ok(id_to_use) => {
+                let id_to_use = *id_to_use;
+                custom_question = get_specific_custom(guild_id.to_string(), id_to_use, ctx).await;
+            }
+            _ => {
+                msg.reply(ctx, "Not a valid question ID").await?;
+                return Ok(());
+            }
         }
     } else {
         custom_question = get_random_custom_question(guild_id.to_string(), ctx).await;
@@ -547,14 +559,17 @@ async fn custom_qotd(ctx: &Context, msg: &Message) -> CommandResult {
 
     let question_string = format_string_for_pings(ping_role, custom_question).await;
 
-    if let Some(channel) = parse_channel(&channel_id) {
-        // Sending message to the channel assigned to the server
-        let channel = ChannelId(channel);
-        channel
-            .send_message(ctx, |message| message.content(question_string))
-            .await?;
-    } else {
-        msg.reply(ctx, "Channel not set!").await?;
+    match parse_channel(&channel_id) {
+        Some(channel) => {
+            // Sending message to the channel assigned to the server
+            let channel = ChannelId(channel);
+            channel
+                .send_message(ctx, |message| message.content(question_string))
+                .await?;
+        }
+        None => {
+            msg.reply(ctx, "Channel not set!").await?;
+        }
     }
 
     Ok(())
@@ -571,12 +586,14 @@ async fn submit_qotd(ctx: &Context, msg: &Message) -> CommandResult {
         user_submission = &msg.content[14..];
 
         if is_under_limit(guild_id.to_string(), ctx).await {
-            if let Ok(_s) =
-                add_custom_question(guild_id.to_string(), user_submission.to_string(), ctx).await
-            {
-                msg.reply(ctx, "Question Submitted").await?;
-            } else {
-                msg.reply(ctx, "Something went wrong!").await?;
+            match add_custom_question(guild_id.to_string(), user_submission.to_string(), ctx).await {
+                Ok(_s) => {
+                    msg.reply(ctx, "Question Submitted").await?;
+                }
+                Err(e) => {
+                    println!("{}", e);
+                    msg.reply(ctx, "Something went wrong!").await?;
+                }
             }
         } else {
             msg.reply(
@@ -598,18 +615,19 @@ async fn delete_question(ctx: &Context, msg: &Message) -> CommandResult {
 
     if msg.content.len() >= 18 {
         // Parsing id from the message
-        if let Ok(id_to_delete) = &msg.content[18..].parse::<i32>() {
-            let id_to_delete = id_to_delete;
-            let test = delete_custom_question(guild_id.to_string(), *id_to_delete, ctx).await;
-            if test == 1 {
-                msg.reply(ctx, "Question deleted!").await?;
-            } else {
-                msg.reply(ctx, "Question not found!").await?;
+        match &msg.content[18..].parse::<i32>() {
+            Ok(id_to_delete) => {
+                let id_to_delete = id_to_delete;
+                let test = delete_custom_question(guild_id.to_string(), *id_to_delete, ctx).await;
+                if test == 1 {
+                    msg.reply(ctx, "Question deleted!").await?;
+                } else {
+                    msg.reply(ctx, "Question not found!").await?;
+                }
             }
-        }
-        // If id not able to be parsed
-        else {
-            msg.reply(ctx, "Please enter a valid ID!").await?;
+            _ => {
+                msg.reply(ctx, "Please enter a valid ID!").await?;
+            }
         }
     } else {
         // Getting all questions
@@ -702,23 +720,34 @@ async fn qotd_ping_role(ctx: &Context, msg: &Message) -> CommandResult {
 
         // If role parameter is one of the preset options
         if parameter == "1" || parameter == "0" {
-            if let Ok(_) = set_ping_role(guild_id.to_string(), String::from(parameter), ctx).await {
-                msg.reply(ctx, "Ping role updated!").await?;
-            } else {
-                msg.reply(ctx, "Something went wrong!").await?;
+            match set_ping_role(guild_id.to_string(), String::from(parameter), ctx).await {
+                Ok(_) => {
+                    msg.reply(ctx, "Ping role updated!").await?;
+                }
+                Err(e) => {
+                    println!("{}", e);
+                    msg.reply(ctx, "Something went wrong!").await?;
+                }
             }
         }
         // Else check whether the role is valid, and submit it if it is
         else {
             // If role is a valid role, submit it to the database
-            if let Some(role) = parse_role(parameter) {
-                if let Ok(_) = set_ping_role(guild_id.to_string(), role.to_string(), ctx).await {
-                    msg.reply(ctx, "Ping role updated!").await?;
-                } else {
-                    msg.reply(ctx, "Something went wrong!").await?;
+            match parse_role(parameter) {
+                Some(role) => {
+                    match set_ping_role(guild_id.to_string(), role.to_string(), ctx).await {
+                        Ok(_) => {
+                            msg.reply(ctx, "Ping role updated!").await?;
+                        }
+                        Err(e) => {
+                            println!("{}",e);
+                            msg.reply(ctx, "Something went wrong!").await?;
+                        }
+                    }
                 }
-            } else {
-                msg.reply(ctx, "Not a valid role!").await?;
+                None => {
+                    msg.reply(ctx, "Not a valid role!").await?;
+                }
             }
         }
     }
@@ -757,24 +786,27 @@ async fn poll(ctx: &Context, msg: &Message) -> CommandResult  {
     let ping_role = get_ping_role(guild_id.to_string(), ctx).await;
     let poll_string = format_string_for_pings(ping_role, String::from("Poll of the day!")).await;
 
-    if let Some(cid) = parse_channel(&channel_id) {
-        // Sending message to the channel assigned to the server
-        let channel = ChannelId(cid);
-        channel
-            .send_message(ctx, |message|
-                message
-                    .content(poll_string)
-                    .embed(|embed| {
-                        embed
-                            .title(&poll[0])
-                            .description(format!("emote - {}\nemote - {}", &poll[1], &poll[2]))
-                            .color(Color::ORANGE)
-                    })
-            )
-            .await?;
+    match parse_channel(&channel_id) {
+        Some(cid) => {
+            // Sending message to the channel assigned to the server
+            let channel = ChannelId(cid);
+            channel
+                .send_message(ctx, |message|
+                    message
+                        .content(poll_string)
+                        .embed(|embed| {
+                            embed
+                                .title(&poll[0])
+                                .description(format!("emote - {}\nemote - {}", &poll[1], &poll[2]))
+                                .color(Color::ORANGE)
+                        })
+                )
+                .await?;
             // Add reactions
-    } else {
-        msg.reply(ctx, "Channel not set!").await?;
+        }
+        None => {
+            msg.reply(ctx, "Channel not set!").await?;
+        }
     }
 
     Ok(())
@@ -801,12 +833,14 @@ async fn submit_poll(ctx: &Context, msg: &Message) -> CommandResult {
         if full_poll.len() == 3 {
 
             if is_under_limit(guild_id.to_string(), ctx).await {
-                if let Ok(_s) =
-                add_custom_poll(guild_id.to_string(), full_poll, ctx).await
-                {
-                    msg.reply(ctx, "Poll Submitted").await?;
-                } else {
-                    msg.reply(ctx, "Something went wrong!").await?;
+                match add_custom_poll(guild_id.to_string(), full_poll, ctx).await {
+                    Ok(_s) => {
+                        msg.reply(ctx, "Poll Submitted").await?;
+                    }
+                    Err(e) => {
+                        println!("{}",e);
+                        msg.reply(ctx, "Something went wrong!").await?;
+                    }
                 }
             } else {
                 msg.reply(
