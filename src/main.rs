@@ -1,4 +1,6 @@
 use std::env;
+use std::error::Error;
+use std::fmt::format;
 use std::sync::Arc;
 
 use serenity::framework::standard::{
@@ -37,7 +39,8 @@ impl TypeMapKey for DataClient {
     submit_qotd,
     delete_question,
     customs,
-    qotd_ping_role
+    qotd_ping_role,
+    poll
 )]
 struct General;
 
@@ -378,6 +381,39 @@ async fn is_under_limit(guild_id: String, ctx: &Context) -> bool {
     }
 }
 
+async fn get_random_poll(ctx: &Context) -> Vec<String> {
+    // Pulling in psql client
+    let read = ctx.data.read().await;
+    let client = read.get::<DataClient>().expect("PSQL Client error").clone();
+
+    let rows = client
+        .query(
+        "SELECT poll_string FROM polls WHERE in_use = $1 ORDER BY random() LIMIT 1",
+        &[&true],
+        )
+        .await
+        .expect("Selecting question failed");
+    let poll_string = rows[0].get(0);
+    poll_string
+}
+
+async fn add_custom_poll(guild_id: String, new_poll: Vec<String>, ctx: &Context) -> Result<u64, tokio_postgres::Error> {
+    // Pulling in psql client
+    let read = ctx.data.read().await;
+    let client = read.get::<DataClient>().expect("PSQL Client error").clone();
+
+    let insert = client
+        .execute(
+            "INSERT INTO custom_questions (guild_id, question_string) VALUES ($1, $2)",
+            &[&guild_id, &new_poll],
+        )
+        .await;
+
+    insert
+}
+
+
+
 #[command]
 async fn help(ctx: &Context, msg: &Message) -> CommandResult {
     msg.channel_id.send_message(ctx, |m| {
@@ -707,3 +743,35 @@ async fn qotd_ping_role(ctx: &Context, msg: &Message) -> CommandResult {
 
     Ok(())
 }
+
+#[command]
+async fn poll(ctx: &Context, msg: &Message) -> CommandResult  {
+    let guild_id = msg.guild_id.unwrap();
+    let poll = get_random_poll(ctx).await;
+    let channel_id = get_channel_id(guild_id.to_string(), ctx).await;
+    let ping_role = get_ping_role(guild_id.to_string(), ctx).await;
+    let poll_string = format_string_for_pings(ping_role, String::from("Poll of the day!")).await;
+
+    if let Some(cid) = parse_channel(&channel_id) {
+        // Sending message to the channel assigned to the server
+        let channel = ChannelId(cid);
+        channel
+            .send_message(ctx, |message|
+                message
+                    .content(poll_string)
+                    .embed(|embed| {
+                        embed
+                            .title(&poll[0])
+                            .description(format!("emote - {}\nemote - {}", &poll[1], &poll[2]))
+                            .color(Color::ORANGE)
+                    })
+            )
+            .await?;
+            // Add reactions
+    } else {
+        msg.reply(ctx, "Channel not set!").await?;
+    }
+
+    Ok(())
+}
+
