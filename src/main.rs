@@ -341,15 +341,15 @@ async fn get_ping_role(guild_id: String, ctx: &Context) -> String {
 
 /// Appends the correct ping to the message based on the ping_role parameter
 /// Returns completed string
-async fn format_string_for_pings(ping_role: String, question: String) -> String {
+async fn format_string_for_pings(ping_role: String, message: String) -> String {
     let question_string;
     if ping_role == String::from("0") {
-        question_string = format!("{}", question);
+        question_string = format!("{}", message);
     } else if ping_role == String::from("1") {
-        question_string = format!("@everyone {}", question);
+        question_string = format!("@everyone {}", message);
     } else {
         // Role validity checked when it is saved to the database
-        question_string = format!("<@&{}> {}", ping_role, question);
+        question_string = format!("<@&{}> {}", ping_role, message);
     }
     question_string
 }
