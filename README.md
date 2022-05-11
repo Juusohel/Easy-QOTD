@@ -1,14 +1,15 @@
 # Easy Question of the Day
-Flexible discord bot for posting questions of the day with possibility for custom questions and more!
+Flexible discord bot for posting questions and polls with possibility for custom questions and more!
 
 ## Features
-With an attached database of questions, the bot will post a random question of the day on demand. 
+With an attached database of questions and polls, the bot will post a random question of the day on demand. 
 Server administrators are able to set specific channels and roles to ping when sending a question.
 There is also support for custom questions!
 
 WIP Features
-- Qotd Scheduling
-- Reaction polls
+- Post Scheduling
+- Flexible poll vote tallying
+
 
 
 
@@ -41,5 +42,6 @@ WIP Features
     - https://github.com/sfackler/rust-postgres
 
 ## Acknowledgements
-Thanks to DioritePoodle for help with writing default questions
+Thanks to DioritePoodle for help with writing default questions.
+
 Thanks to Danny for the bot profile picture.
