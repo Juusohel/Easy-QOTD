@@ -1,4 +1,3 @@
-
 use std::env;
 
 use std::sync::Arc;
@@ -8,9 +7,7 @@ use serenity::framework::standard::{
     CommandResult, StandardFramework,
 };
 
-
-use serenity::model::channel::ReactionType::{Unicode};
-
+use serenity::model::channel::ReactionType::Unicode;
 
 use serenity::model::id::ChannelId;
 use serenity::utils::{parse_channel, parse_role, Color};
@@ -19,7 +16,6 @@ use serenity::{
     model::{channel::Message, gateway::Ready},
     prelude::*,
 };
-
 
 use tokio_postgres::{NoTls, Row};
 
@@ -176,8 +172,6 @@ async fn get_random_question(ctx: &Context) -> String {
         .await
         .expect("Error querying database");
 
-    
-
     rows[0].get(0)
 }
 
@@ -267,11 +261,8 @@ async fn get_random_custom_question(guild_id: String, ctx: &Context) -> String {
         .expect("Error querying database");
 
     if !rows.is_empty() {
-        
-
         rows[0].get(0)
     } else {
-        
         String::from("No custom questions found!")
     }
 }
@@ -420,7 +411,7 @@ async fn get_random_poll(ctx: &Context) -> Vec<String> {
         )
         .await
         .expect("Selecting question failed");
-    
+
     rows[0].get(0)
 }
 
@@ -645,7 +636,8 @@ async fn qotd(ctx: &Context, msg: &Message) -> CommandResult {
     let question = get_random_question(ctx).await;
     let channel_id = get_ping_channel_id(guild_id.to_string(), ctx).await;
     let ping_role = get_ping_role(guild_id.to_string(), ctx).await;
-    let question_string = format_string_for_pings(ping_role, String::from("Question of the day!")).await;
+    let question_string =
+        format_string_for_pings(ping_role, String::from("Question of the day!")).await;
 
     match parse_channel(&channel_id) {
         Some(cid) => {
@@ -653,14 +645,12 @@ async fn qotd(ctx: &Context, msg: &Message) -> CommandResult {
             let channel = ChannelId(cid);
             channel
                 .send_message(ctx, |message| {
-                    message
-                        .content(question_string)
-                        .embed(|embed| {
-                            embed
-                                .title("Question")
-                                .description(question)
-                                .color(Color::FABLED_PINK)
-                        })
+                    message.content(question_string).embed(|embed| {
+                        embed
+                            .title("Question")
+                            .description(question)
+                            .color(Color::FABLED_PINK)
+                    })
                 })
                 .await?;
         }
@@ -695,22 +685,21 @@ async fn custom_qotd(ctx: &Context, msg: &Message) -> CommandResult {
         custom_question = get_random_custom_question(guild_id.to_string(), ctx).await;
     }
 
-    let question_string = format_string_for_pings(ping_role, String::from("Question of the day!")).await;
+    let question_string =
+        format_string_for_pings(ping_role, String::from("Question of the day!")).await;
 
     match parse_channel(&channel_id) {
         Some(channel) => {
             // Sending message to the channel assigned to the server
             let channel = ChannelId(channel);
             channel
-                .send_message(ctx, |message|{
-                    message
-                        .content(question_string)
-                        .embed(|embed|{
-                            embed
-                                .title("Custom Question")
-                                .description(custom_question)
-                                .color(Color::FABLED_PINK)
-                        })
+                .send_message(ctx, |message| {
+                    message.content(question_string).embed(|embed| {
+                        embed
+                            .title("Custom Question")
+                            .description(custom_question)
+                            .color(Color::FABLED_PINK)
+                    })
                 })
                 .await?;
         }
