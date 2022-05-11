@@ -9,6 +9,10 @@ use serenity::framework::standard::{
     CommandResult, StandardFramework,
 };
 
+use serenity::http::routing::RouteInfo::CreateReaction;
+use serenity::model::channel::ReactionType::{Custom, Unicode};
+use serenity::model::channel::{MessageReaction, Reaction};
+use serenity::model::event::EventType::ReactionAdd;
 use serenity::model::id::ChannelId;
 use serenity::utils::{parse_channel, parse_role, Color};
 use serenity::{
@@ -16,13 +20,9 @@ use serenity::{
     model::{channel::Message, gateway::Ready},
     prelude::*,
 };
-use serenity::http::routing::RouteInfo::CreateReaction;
-use serenity::model::channel::{MessageReaction, Reaction};
-use serenity::model::channel::ReactionType::{Custom, Unicode};
-use serenity::model::event::EventType::ReactionAdd;
 
-use tokio_postgres::{NoTls, Row};
 use tokio_postgres::types::ToSql;
+use tokio_postgres::{NoTls, Row};
 
 // Container for psql client
 struct DataClient {
@@ -421,8 +421,8 @@ async fn get_random_poll(ctx: &Context) -> Vec<String> {
 
     let rows = client
         .query(
-        "SELECT poll_string FROM polls WHERE in_use = $1 ORDER BY random() LIMIT 1",
-        &[&true],
+            "SELECT poll_string FROM polls WHERE in_use = $1 ORDER BY random() LIMIT 1",
+            &[&true],
         )
         .await
         .expect("Selecting question failed");
@@ -430,11 +430,14 @@ async fn get_random_poll(ctx: &Context) -> Vec<String> {
     poll_string
 }
 
-async fn add_custom_poll(guild_id: String, new_poll: Vec<String>, ctx: &Context) -> Result<u64, tokio_postgres::Error> {
+async fn add_custom_poll(
+    guild_id: String,
+    new_poll: Vec<String>,
+    ctx: &Context,
+) -> Result<u64, tokio_postgres::Error> {
     // Pulling in psql client
     let read = ctx.data.read().await;
     let client = read.get::<DataClient>().expect("PSQL Client error").clone();
-
 
     let insert = client
         .execute(
@@ -454,7 +457,7 @@ async fn get_random_custom_poll(guild_id: String, ctx: &Context) -> Vec<String> 
     let rows = client
         .query(
             "SELECT poll_string FROM custom_polls WHERE guild_id = $1 ORDER BY random() LIMIT 1",
-            &[&guild_id]
+            &[&guild_id],
         )
         .await
         .expect("Error querying database");
@@ -462,7 +465,7 @@ async fn get_random_custom_poll(guild_id: String, ctx: &Context) -> Vec<String> 
     if rows.len() > 0 {
         poll_vec = rows[0].get(0);
     } else {
-        poll_vec = vec!();
+        poll_vec = vec![];
     }
 
     poll_vec
@@ -484,7 +487,7 @@ async fn get_specific_custom_poll(guild_id: String, poll_id: i32, ctx: &Context)
     if rows.len() > 0 {
         rows[0].get(0)
     } else {
-        vec!()
+        vec![]
     }
 }
 
@@ -581,7 +584,8 @@ async fn set_channel(ctx: &Context, msg: &Message) -> CommandResult {
 
                 if guild_channels.contains_key(&channel_id) {
                     // Calling function to set the the stuff to database
-                    set_ping_channel_id(channel_id_slice.to_string(), guild_id.to_string(), ctx).await?;
+                    set_ping_channel_id(channel_id_slice.to_string(), guild_id.to_string(), ctx)
+                        .await?;
                     msg.reply(ctx, "Channel set!").await?;
                 } else {
                     msg.reply(ctx, "Channel not found on this server!").await?;
@@ -660,7 +664,8 @@ async fn custom_qotd(ctx: &Context, msg: &Message) -> CommandResult {
         match &msg.content[14..].parse::<i32>() {
             Ok(id_to_use) => {
                 let id_to_use = *id_to_use;
-                custom_question = get_specific_custom_question(guild_id.to_string(), id_to_use, ctx).await;
+                custom_question =
+                    get_specific_custom_question(guild_id.to_string(), id_to_use, ctx).await;
             }
             _ => {
                 msg.reply(ctx, "Not a valid question ID").await?;
@@ -700,7 +705,8 @@ async fn submit_qotd(ctx: &Context, msg: &Message) -> CommandResult {
         user_submission = &msg.content[14..];
 
         if question_is_under_limit(guild_id.to_string(), ctx).await {
-            match add_custom_question(guild_id.to_string(), user_submission.to_string(), ctx).await {
+            match add_custom_question(guild_id.to_string(), user_submission.to_string(), ctx).await
+            {
                 Ok(_s) => {
                     msg.reply(ctx, "Question Submitted").await?;
                 }
@@ -854,7 +860,7 @@ async fn ping_role(ctx: &Context, msg: &Message) -> CommandResult {
                             msg.reply(ctx, "Ping role updated!").await?;
                         }
                         Err(e) => {
-                            println!("{}",e);
+                            println!("{}", e);
                             msg.reply(ctx, "Something went wrong!").await?;
                         }
                     }
@@ -893,31 +899,26 @@ async fn ping_role(ctx: &Context, msg: &Message) -> CommandResult {
 }
 
 #[command]
-async fn poll(ctx: &Context, msg: &Message) -> CommandResult  {
+async fn poll(ctx: &Context, msg: &Message) -> CommandResult {
     let guild_id = msg.guild_id.unwrap();
     let poll = get_random_poll(ctx).await;
     let channel_id = get_ping_channel_id(guild_id.to_string(), ctx).await;
     let ping_role = get_ping_role(guild_id.to_string(), ctx).await;
     let poll_string = format_string_for_pings(ping_role, String::from("Poll of the day!")).await;
 
-
     match parse_channel(&channel_id) {
         Some(cid) => {
             // Sending message to the channel assigned to the server
             let channel = ChannelId(cid);
             let message = channel
-                .send_message(ctx, |message|
-                    message
-                        .content(poll_string)
-                        .embed(|embed| {
-                            embed
-                                .title(&poll[0])
-                                .description(format!("🟠 - {}\n🔵 - {}", &poll[1], &poll[2]))
-                                .color(Color::DARK_MAGENTA)
-                        })
-
-
-                )
+                .send_message(ctx, |message| {
+                    message.content(poll_string).embed(|embed| {
+                        embed
+                            .title(&poll[0])
+                            .description(format!("🟠 - {}\n🔵 - {}", &poll[1], &poll[2]))
+                            .color(Color::DARK_MAGENTA)
+                    })
+                })
                 .await?;
             // Orange circle unicode
             message.react(ctx, Unicode(String::from("🟠"))).await?;
@@ -951,14 +952,13 @@ async fn submit_poll(ctx: &Context, msg: &Message) -> CommandResult {
 
         // If message is in correct format
         if full_poll.len() == 3 {
-
             if poll_is_under_limit(guild_id.to_string(), ctx).await {
                 match add_custom_poll(guild_id.to_string(), full_poll, ctx).await {
                     Ok(_s) => {
                         msg.reply(ctx, "Poll Submitted").await?;
                     }
                     Err(e) => {
-                        println!("{}",e);
+                        println!("{}", e);
                         msg.reply(ctx, "Something went wrong!").await?;
                     }
                 }
@@ -967,38 +967,41 @@ async fn submit_poll(ctx: &Context, msg: &Message) -> CommandResult {
                     ctx,
                     "Too many custom polls saved! Please delete some before adding more!",
                 )
-                    .await?;
+                .await?;
             }
         } else {
-            msg.channel_id.send_message(ctx, |message| {
+            msg.channel_id
+                .send_message(ctx, |message| {
+                    message
+                        .content(format!(
+                            "<@{}> Follow this format when submitting new questions!",
+                            msg.author.id
+                        ))
+                        .embed(|embed| {
+                            embed
+                                .title("Custom poll format")
+                                .description("submit_poll Question\nOption1\nOption2")
+                                .color(Color::DARK_BLUE)
+                        })
+                })
+                .await?;
+        }
+    } else {
+        msg.channel_id
+            .send_message(ctx, |message| {
                 message
-                    .content(format!("<@{}> Follow this format when submitting new questions!", msg.author.id))
-                    .embed(|embed|{
+                    .content(format!("<@{}> Please use correct format!", msg.author.id))
+                    .embed(|embed| {
                         embed
                             .title("Custom poll format")
                             .description("submit_poll Question\nOption1\nOption2")
                             .color(Color::DARK_BLUE)
                     })
             })
-                .await?;
-        }
-
-    } else {
-        msg.channel_id.send_message(ctx, |message| {
-            message
-                .content(format!("<@{}> Please use correct format!", msg.author.id))
-                .embed(|embed|{
-                    embed
-                        .title("Custom poll format")
-                        .description("submit_poll Question\nOption1\nOption2")
-                        .color(Color::DARK_BLUE)
-                })
-        })
             .await?;
     }
 
     Ok(())
-
 }
 
 #[command]
@@ -1024,7 +1027,8 @@ async fn custom_poll(ctx: &Context, msg: &Message) -> CommandResult {
     }
 
     if custom_poll.len() < 3 {
-        msg.reply(ctx, "No custom polls saved!\nAdd some with submit_poll!").await?;
+        msg.reply(ctx, "No custom polls saved!\nAdd some with submit_poll!")
+            .await?;
         return Ok(());
     }
     let message_string = format_string_for_pings(ping_role, String::from("Poll of the day!")).await;
@@ -1034,15 +1038,16 @@ async fn custom_poll(ctx: &Context, msg: &Message) -> CommandResult {
             // Sending message to the channel assigned to the server
             let channel = ChannelId(channel);
             let message = channel
-                .send_message(ctx, |message|{
-                    message
-                        .content(message_string)
-                        .embed(|embed|{
-                            embed
-                                .title(&custom_poll[0])
-                                .description(format!("🟠 - {}\n🔵 - {}", &custom_poll[1], custom_poll[2]))
-                                .color(Color::RED)
-                        })
+                .send_message(ctx, |message| {
+                    message.content(message_string).embed(|embed| {
+                        embed
+                            .title(&custom_poll[0])
+                            .description(format!(
+                                "🟠 - {}\n🔵 - {}",
+                                &custom_poll[1], custom_poll[2]
+                            ))
+                            .color(Color::RED)
+                    })
                 })
                 .await?;
 
@@ -1050,7 +1055,6 @@ async fn custom_poll(ctx: &Context, msg: &Message) -> CommandResult {
             message.react(ctx, Unicode(String::from("🟠"))).await?;
             // Blue circle unicode
             message.react(ctx, Unicode(String::from("🔵"))).await?;
-
         }
         None => {
             msg.reply(ctx, "Channel not set!").await?;
@@ -1061,7 +1065,7 @@ async fn custom_poll(ctx: &Context, msg: &Message) -> CommandResult {
 }
 
 #[command]
-async fn list_polls(ctx: &Context, msg: &Message)-> CommandResult {
+async fn list_polls(ctx: &Context, msg: &Message) -> CommandResult {
     let guild_id = msg.guild_id.unwrap();
     // Getting all questions
     let polls_list = get_list_of_custom_polls(guild_id.to_string(), ctx).await;
@@ -1086,12 +1090,12 @@ async fn list_polls(ctx: &Context, msg: &Message)-> CommandResult {
                     "<@{}> Here's a list of all saved custom polls",
                     msg.author.id
                 ))
-                    .embed(|embed| {
-                        embed
-                            .title("Polls")
-                            .description(pretty_list)
-                            .color(Color::RED)
-                    })
+                .embed(|embed| {
+                    embed
+                        .title("Polls")
+                        .description(pretty_list)
+                        .color(Color::RED)
+                })
             })
             .await?;
     } else {
@@ -1145,12 +1149,12 @@ async fn delete_poll(ctx: &Context, msg: &Message) -> CommandResult {
                         "<@{}> Please specify the ID of poll",
                         msg.author.id
                     ))
-                        .embed(|embed| {
-                            embed
-                                .title("Questions")
-                                .description(pretty_list)
-                                .color(Color::DARK_BLUE)
-                        })
+                    .embed(|embed| {
+                        embed
+                            .title("Questions")
+                            .description(pretty_list)
+                            .color(Color::DARK_BLUE)
+                    })
                 })
                 .await?;
         } else {
