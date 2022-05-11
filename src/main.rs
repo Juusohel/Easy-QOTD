@@ -1,7 +1,6 @@
-use std::borrow::BorrowMut;
+
 use std::env;
-use std::error::Error;
-use std::fmt::format;
+
 use std::sync::Arc;
 
 use serenity::framework::standard::{
@@ -9,10 +8,10 @@ use serenity::framework::standard::{
     CommandResult, StandardFramework,
 };
 
-use serenity::http::routing::RouteInfo::CreateReaction;
-use serenity::model::channel::ReactionType::{Custom, Unicode};
-use serenity::model::channel::{MessageReaction, Reaction};
-use serenity::model::event::EventType::ReactionAdd;
+
+use serenity::model::channel::ReactionType::{Unicode};
+
+
 use serenity::model::id::ChannelId;
 use serenity::utils::{parse_channel, parse_role, Color};
 use serenity::{
@@ -21,7 +20,7 @@ use serenity::{
     prelude::*,
 };
 
-use tokio_postgres::types::ToSql;
+
 use tokio_postgres::{NoTls, Row};
 
 // Container for psql client
@@ -150,7 +149,7 @@ async fn get_ping_channel_id(guild_id: String, ctx: &Context) -> String {
         .await
         .expect("Error querying database");
     let channel_string;
-    if rows.len() > 0 {
+    if !rows.is_empty() {
         channel_id = rows[0].get(0);
         channel_string = format!("<#{}>", channel_id);
     } else {
@@ -177,9 +176,9 @@ async fn get_random_question(ctx: &Context) -> String {
         .await
         .expect("Error querying database");
 
-    let question_string = rows[0].get(0);
+    
 
-    question_string
+    rows[0].get(0)
 }
 
 /// Adds a custom question to the database with the associated guild_id
@@ -221,7 +220,7 @@ async fn delete_custom_question(guild_id: String, question_id: i32, ctx: &Contex
         )
         .await
         .expect("Select Failed");
-    if rows.len() > 0 {
+    if !rows.is_empty() {
         let _delete = client
             .execute(
                 "DELETE FROM custom_questions WHERE question_id = $1",
@@ -267,13 +266,13 @@ async fn get_random_custom_question(guild_id: String, ctx: &Context) -> String {
         .await
         .expect("Error querying database");
 
-    if rows.len() > 0 {
-        let question_string = rows[0].get(0);
+    if !rows.is_empty() {
+        
 
-        question_string
+        rows[0].get(0)
     } else {
-        let question_string = String::from("No custom questions found!");
-        question_string
+        
+        String::from("No custom questions found!")
     }
 }
 
@@ -291,7 +290,7 @@ async fn get_specific_custom_question(guild_id: String, question_id: i32, ctx: &
         .await
         .expect("Error querying database");
 
-    if rows.len() > 0 {
+    if !rows.is_empty() {
         rows[0].get(0)
     } else {
         String::from("Question does not exist!")
@@ -344,7 +343,7 @@ async fn get_ping_role(guild_id: String, ctx: &Context) -> String {
         .expect("Error querying database");
 
     // Return the ping role as string
-    if rows.len() > 0 {
+    if !rows.is_empty() {
         rows[0].get(0)
     } else {
         //Return 0 if there's no ping role assigned
@@ -356,9 +355,9 @@ async fn get_ping_role(guild_id: String, ctx: &Context) -> String {
 /// Returns completed string
 async fn format_string_for_pings(ping_role: String, message: String) -> String {
     let question_string;
-    if ping_role == String::from("0") {
-        question_string = format!("{}", message);
-    } else if ping_role == String::from("1") {
+    if ping_role == *"0" {
+        question_string = message;
+    } else if ping_role == *"1" {
         question_string = format!("@everyone {}", message);
     } else {
         // Role validity checked when it is saved to the database
@@ -384,11 +383,7 @@ async fn question_is_under_limit(guild_id: String, ctx: &Context) -> bool {
         .await
         .expect("psql count failed");
     let count: i64 = rows[0].get(0);
-    if count >= limit {
-        false
-    } else {
-        true
-    }
+    count < limit
 }
 
 async fn poll_is_under_limit(guild_id: String, ctx: &Context) -> bool {
@@ -406,11 +401,7 @@ async fn poll_is_under_limit(guild_id: String, ctx: &Context) -> bool {
         .expect("psql count failed");
 
     let count: i64 = rows[0].get(0);
-    if count >= limit {
-        false
-    } else {
-        true
-    }
+    count < limit
 }
 
 /// Gets a random poll from the database and returns it
@@ -426,8 +417,8 @@ async fn get_random_poll(ctx: &Context) -> Vec<String> {
         )
         .await
         .expect("Selecting question failed");
-    let poll_string = rows[0].get(0);
-    poll_string
+    
+    rows[0].get(0)
 }
 
 async fn add_custom_poll(
@@ -462,7 +453,7 @@ async fn get_random_custom_poll(guild_id: String, ctx: &Context) -> Vec<String> 
         .await
         .expect("Error querying database");
 
-    if rows.len() > 0 {
+    if !rows.is_empty() {
         poll_vec = rows[0].get(0);
     } else {
         poll_vec = vec![];
@@ -484,7 +475,7 @@ async fn get_specific_custom_poll(guild_id: String, poll_id: i32, ctx: &Context)
         .await
         .expect("Error querying database");
 
-    if rows.len() > 0 {
+    if !rows.is_empty() {
         rows[0].get(0)
     } else {
         vec![]
@@ -521,7 +512,7 @@ async fn delete_custom_poll(guild_id: String, id_to_delete: i32, ctx: &Context) 
         )
         .await
         .expect("Select Failed");
-    if rows.len() > 0 {
+    if !rows.is_empty() {
         let _delete = client
             .execute(
                 "DELETE FROM custom_polls WHERE poll_id = $1",
@@ -754,7 +745,7 @@ async fn delete_question(ctx: &Context, msg: &Message) -> CommandResult {
         let question_list = get_list_custom_questions(guild_id.to_string(), ctx).await;
 
         // If there are custom questions saved
-        if question_list.len() > 0 {
+        if !question_list.is_empty() {
             // Formatting vector for printing
             let length = question_list.len();
 
@@ -795,7 +786,7 @@ async fn list_qotd(ctx: &Context, msg: &Message) -> CommandResult {
     let question_list = get_list_custom_questions(guild_id.to_string(), ctx).await;
 
     // If there are custom questions saved
-    if question_list.len() > 0 {
+    if !question_list.is_empty() {
         // Formatting vector for printing
         let length = question_list.len();
 
@@ -874,7 +865,7 @@ async fn ping_role(ctx: &Context, msg: &Message) -> CommandResult {
     // If no parameters, send default help message
     else {
         // Formatting current role to taggable form if it's not 0 or 1
-        if (current_role != String::from("1")) && (current_role != String::from("0")) {
+        if (current_role != *"1") && (current_role != *"0") {
             // No need to check if the role is a valid role, validity is checked on submission to the database.
             current_role = format!("<@&{}>", current_role);
         }
@@ -942,7 +933,7 @@ async fn submit_poll(ctx: &Context, msg: &Message) -> CommandResult {
     // If message has content
     if msg.content.len() >= 14 {
         user_submission = &msg.content[14..];
-        let split = user_submission.split("\n"); // Splitting message to its parts
+        let split = user_submission.split('\n'); // Splitting message to its parts
 
         // Converting slices to strings
         let mut full_poll: Vec<String> = vec![];
@@ -1071,7 +1062,7 @@ async fn list_polls(ctx: &Context, msg: &Message) -> CommandResult {
     let polls_list = get_list_of_custom_polls(guild_id.to_string(), ctx).await;
 
     // If there are custom questions saved
-    if polls_list.len() > 0 {
+    if !polls_list.is_empty() {
         // Formatting vector for printing
         let length = polls_list.len();
 
@@ -1130,7 +1121,7 @@ async fn delete_poll(ctx: &Context, msg: &Message) -> CommandResult {
         let polls_list = get_list_of_custom_polls(guild_id.to_string(), ctx).await;
 
         // If there are custom questions saved
-        if polls_list.len() > 0 {
+        if !polls_list.is_empty() {
             // Formatting vector for printing
             let length = polls_list.len();
 
