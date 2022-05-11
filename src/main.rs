@@ -44,7 +44,8 @@ impl TypeMapKey for DataClient {
     ping_role,
     poll,
     submit_poll,
-    custom_poll
+    custom_poll,
+    list_polls
 )]
 struct General;
 
@@ -482,6 +483,21 @@ async fn get_specific_custom_poll(guild_id: String, poll_id: i32, ctx: &Context)
     }
 }
 
+async fn get_list_of_custom_polls(guild_id: String, ctx: &Context) -> Vec<Row> {
+    // Pulling in psql client
+    let read = ctx.data.read().await;
+    let client = read.get::<DataClient>().expect("PSQL Client error").clone();
+
+    let rows = client
+        .query(
+            "SELECT * FROM custom_polls WHERE guild_id = $1",
+            &[&guild_id],
+        )
+        .await
+        .expect("Error querying database");
+
+    rows
+}
 
 #[command]
 async fn help(ctx: &Context, msg: &Message) -> CommandResult {
@@ -994,6 +1010,47 @@ async fn custom_poll(ctx: &Context, msg: &Message) -> CommandResult {
         None => {
             msg.reply(ctx, "Channel not set!").await?;
         }
+    }
+
+    Ok(())
+}
+
+#[command]
+async fn list_polls(ctx: &Context, msg: &Message)-> CommandResult {
+    let guild_id = msg.guild_id.unwrap();
+    // Getting all questions
+    let polls_list = get_list_of_custom_polls(guild_id.to_string(), ctx).await;
+
+    // If there are custom questions saved
+    if polls_list.len() > 0 {
+        // Formatting vector for printing
+        let length = polls_list.len();
+
+        let mut pretty_list = "ID - Poll Question\n".to_string();
+        // Putting the questions onto the list
+        for i in 0..length {
+            let poll_id: i32 = polls_list[i].get(0);
+            let poll_full: Vec<String> = polls_list[i].get(2);
+            let poll_question_string = &poll_full[0];
+            pretty_list = format!("{}{} - {} \n", pretty_list, poll_id, poll_question_string)
+        }
+        // Listing questions in message
+        msg.channel_id
+            .send_message(ctx, |m| {
+                m.content(format!(
+                    "<@{}> Here's a list of all saved custom polls",
+                    msg.author.id
+                ))
+                    .embed(|embed| {
+                        embed
+                            .title("Polls")
+                            .description(pretty_list)
+                            .color(Color::RED)
+                    })
+            })
+            .await?;
+    } else {
+        msg.reply(ctx, "No custom polls found!").await?;
     }
 
     Ok(())
