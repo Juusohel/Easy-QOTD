@@ -16,6 +16,10 @@ use serenity::{
     model::{channel::Message, gateway::Ready},
     prelude::*,
 };
+use serenity::http::routing::RouteInfo::CreateReaction;
+use serenity::model::channel::{MessageReaction, Reaction};
+use serenity::model::channel::ReactionType::{Custom, Unicode};
+use serenity::model::event::EventType::ReactionAdd;
 
 use tokio_postgres::{NoTls, Row};
 use tokio_postgres::types::ToSql;
@@ -896,23 +900,29 @@ async fn poll(ctx: &Context, msg: &Message) -> CommandResult  {
     let ping_role = get_ping_role(guild_id.to_string(), ctx).await;
     let poll_string = format_string_for_pings(ping_role, String::from("Poll of the day!")).await;
 
+
     match parse_channel(&channel_id) {
         Some(cid) => {
             // Sending message to the channel assigned to the server
             let channel = ChannelId(cid);
-            channel
+            let message = channel
                 .send_message(ctx, |message|
                     message
                         .content(poll_string)
                         .embed(|embed| {
                             embed
                                 .title(&poll[0])
-                                .description(format!("emote - {}\nemote - {}", &poll[1], &poll[2]))
-                                .color(Color::ORANGE)
+                                .description(format!("🟠 - {}\n🔵 - {}", &poll[1], &poll[2]))
+                                .color(Color::DARK_MAGENTA)
                         })
+
+
                 )
                 .await?;
-            // Add reactions
+            // Orange circle unicode
+            message.react(ctx, Unicode(String::from("🟠"))).await?;
+            // Blue circle unicode
+            message.react(ctx, Unicode(String::from("🔵"))).await?;
         }
         None => {
             msg.reply(ctx, "Channel not set!").await?;
@@ -1023,19 +1033,24 @@ async fn custom_poll(ctx: &Context, msg: &Message) -> CommandResult {
         Some(channel) => {
             // Sending message to the channel assigned to the server
             let channel = ChannelId(channel);
-            channel
+            let message = channel
                 .send_message(ctx, |message|{
                     message
                         .content(message_string)
                         .embed(|embed|{
                             embed
                                 .title(&custom_poll[0])
-                                .description(format!("{}\n {}", &custom_poll[1], custom_poll[2]))
+                                .description(format!("🟠 - {}\n🔵 - {}", &custom_poll[1], custom_poll[2]))
                                 .color(Color::RED)
                         })
                 })
                 .await?;
-            // Add reactions
+
+            // Orange circle unicode
+            message.react(ctx, Unicode(String::from("🟠"))).await?;
+            // Blue circle unicode
+            message.react(ctx, Unicode(String::from("🔵"))).await?;
+
         }
         None => {
             msg.reply(ctx, "Channel not set!").await?;
