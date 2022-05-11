@@ -386,6 +386,9 @@ async fn question_is_under_limit(guild_id: String, ctx: &Context) -> bool {
     count < limit
 }
 
+/// Checking whether the server has reached its limit on polls submitted to the database
+/// Returns true if server is under the limit
+/// Returns false if server is over limit
 async fn poll_is_under_limit(guild_id: String, ctx: &Context) -> bool {
     // Pulling in psql client
     let read = ctx.data.read().await;
@@ -421,6 +424,7 @@ async fn get_random_poll(ctx: &Context) -> Vec<String> {
     rows[0].get(0)
 }
 
+/// Inserts a custom poll into the database and associates it with a guild_id
 async fn add_custom_poll(
     guild_id: String,
     new_poll: Vec<String>,
@@ -440,6 +444,8 @@ async fn add_custom_poll(
     insert
 }
 
+/// Returns a random custom poll from the list of polls saved in the database for the guild.
+/// Returns an empty array if no custom polls are saved
 async fn get_random_custom_poll(guild_id: String, ctx: &Context) -> Vec<String> {
     // Pulling in psql client
     let read = ctx.data.read().await;
@@ -462,6 +468,7 @@ async fn get_random_custom_poll(guild_id: String, ctx: &Context) -> Vec<String> 
     poll_vec
 }
 
+/// Returns a custom poll from the database using a specified id
 async fn get_specific_custom_poll(guild_id: String, poll_id: i32, ctx: &Context) -> Vec<String> {
     // Pulling in psql client
     let read = ctx.data.read().await;
@@ -482,6 +489,8 @@ async fn get_specific_custom_poll(guild_id: String, poll_id: i32, ctx: &Context)
     }
 }
 
+/// Returns a vector of rows containing all the custom polls saved for the server
+/// Returns and empty vector if no polls exist.
 async fn get_list_of_custom_polls(guild_id: String, ctx: &Context) -> Vec<Row> {
     // Pulling in psql client
     let read = ctx.data.read().await;
@@ -498,6 +507,8 @@ async fn get_list_of_custom_polls(guild_id: String, ctx: &Context) -> Vec<Row> {
     rows
 }
 
+/// Deletes a custom poll based on a ID
+/// Checks guild_id of the requesting command against the guild_id associated with the poll
 async fn delete_custom_poll(guild_id: String, id_to_delete: i32, ctx: &Context) -> i32 {
     // Pulling in psql client
     let read = ctx.data.read().await;
@@ -537,13 +548,21 @@ async fn help(ctx: &Context, msg: &Message) -> CommandResult {
                     .title("Help")
                     .description("
                     **Current command prefix:** q! \n
+                    \n **Questions**
                     **qotd** - Sends a random question of the day! \n
-                    **custom_qotd <Optional: id>** - Sends a question of the day from the list of custom questions! \n
-                    **set_qotd_channel** - Sets which channel is used for questions of the day. \n
-                    **qotd_channel** - Lists which channel is currently used for questions of the day.\n
+                    **custom_qotd <Optional: id>** - Sends a question of the day from the list of custom questions! \n\
                     **submit_qotd <question>** - Submit a custom question.\n
                     **delete_question <id>** - Deletes the specified question from the list of questions.\n
                     **list_qotd** - Lists all custom questions saved for the server.\n
+                    \n **Polls**
+                    **poll** - Sends a random poll of the day!\n
+                    **custom_poll <Optional: id>** - Sends a poll of the day from a list of custom polls!\n
+                    **submit_poll** - Submits a new custom poll!\n
+                    **delete_poll <id>** - Deletes the specified poll from the list of custom polls\n
+                    **list_polls** - Lists all polls currently saved for the server!\n
+                    \n **Config**
+                    **set_channel** - Sets which channel is used for questions of the day. \n
+                    **channel** - Lists which channel is currently used for questions of the day.\n
                     **ping_role <0 (default)/1/<role>>** - Sets the ping setting for question of the day. \n
                     **help** - Brings up this message!")
                     .color(Color::DARK_GREEN)
@@ -626,14 +645,23 @@ async fn qotd(ctx: &Context, msg: &Message) -> CommandResult {
     let question = get_random_question(ctx).await;
     let channel_id = get_ping_channel_id(guild_id.to_string(), ctx).await;
     let ping_role = get_ping_role(guild_id.to_string(), ctx).await;
-    let question_string = format_string_for_pings(ping_role, question).await;
+    let question_string = format_string_for_pings(ping_role, String::from("Question of the day!")).await;
 
     match parse_channel(&channel_id) {
         Some(cid) => {
             // Sending message to the channel assigned to the server
             let channel = ChannelId(cid);
             channel
-                .send_message(ctx, |message| message.content(question_string))
+                .send_message(ctx, |message| {
+                    message
+                        .content(question_string)
+                        .embed(|embed| {
+                            embed
+                                .title("Question")
+                                .description(question)
+                                .color(Color::FABLED_PINK)
+                        })
+                })
                 .await?;
         }
         None => {
@@ -667,14 +695,23 @@ async fn custom_qotd(ctx: &Context, msg: &Message) -> CommandResult {
         custom_question = get_random_custom_question(guild_id.to_string(), ctx).await;
     }
 
-    let question_string = format_string_for_pings(ping_role, custom_question).await;
+    let question_string = format_string_for_pings(ping_role, String::from("Question of the day!")).await;
 
     match parse_channel(&channel_id) {
         Some(channel) => {
             // Sending message to the channel assigned to the server
             let channel = ChannelId(channel);
             channel
-                .send_message(ctx, |message| message.content(question_string))
+                .send_message(ctx, |message|{
+                    message
+                        .content(question_string)
+                        .embed(|embed|{
+                            embed
+                                .title("Custom Question")
+                                .description(custom_question)
+                                .color(Color::FABLED_PINK)
+                        })
+                })
                 .await?;
         }
         None => {
@@ -1037,7 +1074,7 @@ async fn custom_poll(ctx: &Context, msg: &Message) -> CommandResult {
                                 "🟠 - {}\n🔵 - {}",
                                 &custom_poll[1], custom_poll[2]
                             ))
-                            .color(Color::RED)
+                            .color(Color::DARK_MAGENTA)
                     })
                 })
                 .await?;
