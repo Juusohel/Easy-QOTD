@@ -45,7 +45,8 @@ impl TypeMapKey for DataClient {
     poll,
     submit_poll,
     custom_poll,
-    list_polls
+    list_polls,
+    delete_poll
 )]
 struct General;
 
@@ -497,6 +498,35 @@ async fn get_list_of_custom_polls(guild_id: String, ctx: &Context) -> Vec<Row> {
         .expect("Error querying database");
 
     rows
+}
+
+async fn delete_custom_poll(guild_id: String, id_to_delete: i32, ctx: &Context) -> i32 {
+    // Pulling in psql client
+    let read = ctx.data.read().await;
+    let client = read.get::<DataClient>().expect("PSQL Client error").clone();
+
+    // Checking if a poll with the guild_id of the requesting server exists, if it exists, delete the question.
+    // This prevents from other servers deleting each others questions.
+    let rows = client
+        .query(
+            "SELECT * FROM custom_polls WHERE guild_id = $1 AND poll_id = $2",
+            &[&guild_id, &id_to_delete],
+        )
+        .await
+        .expect("Select Failed");
+    if rows.len() > 0 {
+        let _delete = client
+            .execute(
+                "DELETE FROM custom_polls WHERE poll_id = $1",
+                &[&id_to_delete],
+            )
+            .await
+            .expect("Delete failed");
+
+        1
+    } else {
+        0
+    }
 }
 
 #[command]
@@ -1051,6 +1081,66 @@ async fn list_polls(ctx: &Context, msg: &Message)-> CommandResult {
             .await?;
     } else {
         msg.reply(ctx, "No custom polls found!").await?;
+    }
+
+    Ok(())
+}
+
+#[command]
+async fn delete_poll(ctx: &Context, msg: &Message) -> CommandResult {
+    let guild_id = msg.guild_id.unwrap();
+
+    if msg.content.len() >= 14 {
+        // Parsing id from the message
+        match &msg.content[14..].parse::<i32>() {
+            Ok(id_to_delete) => {
+                let id_to_delete = id_to_delete;
+                let test = delete_custom_poll(guild_id.to_string(), *id_to_delete, ctx).await;
+                if test == 1 {
+                    msg.reply(ctx, "Poll deleted!").await?;
+                } else {
+                    msg.reply(ctx, "Poll not found!").await?;
+                }
+            }
+            _ => {
+                msg.reply(ctx, "Please enter a valid ID!").await?;
+            }
+        }
+    } else {
+        // Getting all polls
+        let polls_list = get_list_of_custom_polls(guild_id.to_string(), ctx).await;
+
+        // If there are custom questions saved
+        if polls_list.len() > 0 {
+            // Formatting vector for printing
+            let length = polls_list.len();
+
+            let mut pretty_list = "ID - Poll\n".to_string();
+            // Putting the polls onto the list
+            for i in 0..length {
+                let poll_id: i32 = polls_list[i].get(0);
+                let poll_full: Vec<String> = polls_list[i].get(2);
+                let poll_question_string = &poll_full[0];
+                pretty_list = format!("{}{} - {} \n", pretty_list, poll_id, poll_question_string)
+            }
+            // Listing questions in message
+            msg.channel_id
+                .send_message(ctx, |m| {
+                    m.content(format!(
+                        "<@{}> Please specify the ID of poll",
+                        msg.author.id
+                    ))
+                        .embed(|embed| {
+                            embed
+                                .title("Questions")
+                                .description(pretty_list)
+                                .color(Color::DARK_BLUE)
+                        })
+                })
+                .await?;
+        } else {
+            msg.reply(ctx, "No custom questions found!").await?;
+        }
     }
 
     Ok(())
