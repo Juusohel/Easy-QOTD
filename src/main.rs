@@ -967,6 +967,10 @@ async fn custom_poll(ctx: &Context, msg: &Message) -> CommandResult {
         custom_poll = get_random_custom_poll(guild_id.to_string(), ctx).await;
     }
 
+    if custom_poll.len() < 3 {
+        msg.reply(ctx, "No custom polls saved!\nAdd some with submit_poll!").await?;
+        return Ok(());
+    }
     let message_string = format_string_for_pings(ping_role, String::from("Poll of the day!")).await;
 
     match parse_channel(&channel_id) {
