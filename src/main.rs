@@ -105,7 +105,7 @@ async fn main() {
 /// Setting the channel id from the database for the server id in question
 /// guild_id is from parsed within the command.
 /// channel_id: String - Channel id to be set in the database
-async fn set_ping_channel_id(
+async fn set_ping_channel_id_qotd(
     channel_id: String,
     guild_id: String,
     ctx: &Context,
@@ -131,7 +131,7 @@ async fn set_ping_channel_id(
 
 /// Pulls channel id formatted for parse_channel() from the database using the guild id.
 /// Returns "0" if no result
-async fn get_ping_channel_id(guild_id: String, ctx: &Context) -> String {
+async fn get_ping_channel_id_qotd(guild_id: String, ctx: &Context) -> String {
     // Pulling in psql client
     let read = ctx.data.read().await;
     let client = read.get::<DataClient>().expect("PSQL Client error").clone();
@@ -293,7 +293,7 @@ async fn get_specific_custom_question(guild_id: String, question_id: i32, ctx: &
 /// 0 is used for no ping
 /// 1 is used for EVERYONE
 /// submitted id is used for specific role
-async fn set_ping_role(
+async fn set_ping_role_qotd(
     guild_id: String,
     ping_role: String,
     ctx: &Context,
@@ -320,7 +320,7 @@ async fn set_ping_role(
 ///  0 is used for no ping
 /// 1 is used for EVERYONE
 /// submitted id is used for specific role
-async fn get_ping_role(guild_id: String, ctx: &Context) -> String {
+async fn get_ping_role_qotd(guild_id: String, ctx: &Context) -> String {
     // Pulling in psql client
     let read = ctx.data.read().await;
     let client = read.get::<DataClient>().expect("PSQL Client error").clone();
@@ -585,7 +585,7 @@ async fn set_channel(ctx: &Context, msg: &Message) -> CommandResult {
 
                 if guild_channels.contains_key(&channel_id) {
                     // Calling function to set the the stuff to database
-                    set_ping_channel_id(channel_id_slice.to_string(), guild_id.to_string(), ctx)
+                    set_ping_channel_id_qotd(channel_id_slice.to_string(), guild_id.to_string(), ctx)
                         .await?;
                     msg.reply(ctx, "Channel set!").await?;
                 } else {
@@ -609,7 +609,7 @@ async fn set_channel(ctx: &Context, msg: &Message) -> CommandResult {
 async fn channel(ctx: &Context, msg: &Message) -> CommandResult {
     let guild_id = msg.guild_id.unwrap(); // lazy solution, expecting the message to exist
 
-    let channel_id = get_ping_channel_id(guild_id.to_string(), ctx).await;
+    let channel_id = get_ping_channel_id_qotd(guild_id.to_string(), ctx).await;
 
     // Slightly convoluted. If the string returned is a 0, that means there was no result
     // This assumes channel id 0 does not exist on any server (safe assumption)
@@ -634,8 +634,8 @@ async fn channel(ctx: &Context, msg: &Message) -> CommandResult {
 async fn qotd(ctx: &Context, msg: &Message) -> CommandResult {
     let guild_id = msg.guild_id.unwrap();
     let question = get_random_question(ctx).await;
-    let channel_id = get_ping_channel_id(guild_id.to_string(), ctx).await;
-    let ping_role = get_ping_role(guild_id.to_string(), ctx).await;
+    let channel_id = get_ping_channel_id_qotd(guild_id.to_string(), ctx).await;
+    let ping_role = get_ping_role_qotd(guild_id.to_string(), ctx).await;
     let question_string =
         format_string_for_pings(ping_role, String::from("Question of the day!")).await;
 
@@ -666,8 +666,8 @@ async fn qotd(ctx: &Context, msg: &Message) -> CommandResult {
 async fn custom_qotd(ctx: &Context, msg: &Message) -> CommandResult {
     let guild_id = msg.guild_id.unwrap();
     let custom_question;
-    let channel_id = get_ping_channel_id(guild_id.to_string(), ctx).await;
-    let ping_role = get_ping_role(guild_id.to_string(), ctx).await;
+    let channel_id = get_ping_channel_id_qotd(guild_id.to_string(), ctx).await;
+    let ping_role = get_ping_role_qotd(guild_id.to_string(), ctx).await;
 
     if msg.content.len() >= 14 {
         match &msg.content[14..].parse::<i32>() {
@@ -849,7 +849,7 @@ async fn list_qotd(ctx: &Context, msg: &Message) -> CommandResult {
 #[command]
 async fn ping_role(ctx: &Context, msg: &Message) -> CommandResult {
     let guild_id = msg.guild_id.unwrap();
-    let mut current_role = get_ping_role(guild_id.to_string(), ctx).await;
+    let mut current_role = get_ping_role_qotd(guild_id.to_string(), ctx).await;
 
     // Checking if there's parameters in the command
     if msg.content.len() >= 12 {
@@ -857,7 +857,7 @@ async fn ping_role(ctx: &Context, msg: &Message) -> CommandResult {
 
         // If role parameter is one of the preset options
         if parameter == "1" || parameter == "0" {
-            match set_ping_role(guild_id.to_string(), String::from(parameter), ctx).await {
+            match set_ping_role_qotd(guild_id.to_string(), String::from(parameter), ctx).await {
                 Ok(_) => {
                     msg.reply(ctx, "Ping role updated!").await?;
                 }
@@ -872,7 +872,7 @@ async fn ping_role(ctx: &Context, msg: &Message) -> CommandResult {
             // If role is a valid role, submit it to the database
             match parse_role(parameter) {
                 Some(role) => {
-                    match set_ping_role(guild_id.to_string(), role.to_string(), ctx).await {
+                    match set_ping_role_qotd(guild_id.to_string(), role.to_string(), ctx).await {
                         Ok(_) => {
                             msg.reply(ctx, "Ping role updated!").await?;
                         }
@@ -919,8 +919,8 @@ async fn ping_role(ctx: &Context, msg: &Message) -> CommandResult {
 async fn poll(ctx: &Context, msg: &Message) -> CommandResult {
     let guild_id = msg.guild_id.unwrap();
     let poll = get_random_poll(ctx).await;
-    let channel_id = get_ping_channel_id(guild_id.to_string(), ctx).await;
-    let ping_role = get_ping_role(guild_id.to_string(), ctx).await;
+    let channel_id = get_ping_channel_id_qotd(guild_id.to_string(), ctx).await;
+    let ping_role = get_ping_role_qotd(guild_id.to_string(), ctx).await;
     let poll_string = format_string_for_pings(ping_role, String::from("Poll of the day!")).await;
 
     match parse_channel(&channel_id) {
@@ -1025,8 +1025,8 @@ async fn submit_poll(ctx: &Context, msg: &Message) -> CommandResult {
 async fn custom_poll(ctx: &Context, msg: &Message) -> CommandResult {
     let guild_id = msg.guild_id.unwrap();
     let custom_poll;
-    let channel_id = get_ping_channel_id(guild_id.to_string(), ctx).await;
-    let ping_role = get_ping_role(guild_id.to_string(), ctx).await;
+    let channel_id = get_ping_channel_id_qotd(guild_id.to_string(), ctx).await;
+    let ping_role = get_ping_role_qotd(guild_id.to_string(), ctx).await;
 
     if msg.content.len() >= 14 {
         match &msg.content[14..].parse::<i32>() {
