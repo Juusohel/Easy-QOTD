@@ -117,7 +117,7 @@ async fn set_ping_channel_id_qotd(
     // Upserting into the database
     let upsert = client
         .execute(
-            "INSERT INTO channels (guild_id, channel_id)
+            "INSERT INTO qotd_channels (guild_id, channel_id)
             VALUES ($1, $2)
             ON CONFLICT (guild_id)
             DO
@@ -139,7 +139,7 @@ async fn get_ping_channel_id_qotd(guild_id: String, ctx: &Context) -> String {
     let channel_id: String;
     let rows = client
         .query(
-            "SELECT channel_id FROM channels WHERE guild_id = $1",
+            "SELECT channel_id FROM qotd_channels WHERE guild_id = $1",
             &[&guild_id],
         )
         .await
@@ -304,7 +304,7 @@ async fn set_ping_role_qotd(
 
     let upsert = client
         .execute(
-            "INSERT INTO ping_roles (guild_id, ping_role)
+            "INSERT INTO qotd_ping_roles (guild_id, ping_role)
             VALUES ($1, $2)
             ON CONFLICT (guild_id)
             DO
@@ -327,7 +327,7 @@ async fn get_ping_role_qotd(guild_id: String, ctx: &Context) -> String {
 
     let rows = client
         .query(
-            "SELECT ping_role FROM ping_roles WHERE guild_id = $1",
+            "SELECT ping_role FROM qotd_ping_roles WHERE guild_id = $1",
             &[&guild_id],
         )
         .await

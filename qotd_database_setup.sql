@@ -1,4 +1,4 @@
-CREATE TABLE channels (
+CREATE TABLE qotd_channels (
 guild_id varchar PRIMARY KEY,
 channel_id varchar NOT NULL
 );
@@ -15,7 +15,7 @@ CREATE TABLE custom_questions (
     question_string varchar NOT NULL
 );
 
-CREATE TABLE ping_roles (
+CREATE TABLE qotd_ping_roles (
     guild_id varchar PRIMARY KEY,
     ping_role varchar NOT NULL
 );
